@@ -1,0 +1,393 @@
+/* ---------------------------------------------------------------
+   Design tokens
+   Palette: aged ledger paper, ink, and three stamp colors for the
+   trade-direction badges (the page's signature element).
+----------------------------------------------------------------- */
+:root {
+  --paper: #ece7d8;
+  --paper-line: #c9c2a8;
+  --paper-raised: #f4f0e4;
+  --ink: #21261f;
+  --ink-soft: #565c4c;
+  --ink-faint: #8a8a72;
+
+  --accent: #2a3a55;
+  --accent-soft: #5b6c8a;
+
+  --stamp-long: #2f4a34;
+  --stamp-short: #7a2e2e;
+  --stamp-spread: #4a3a6a;
+
+  --font-display: "Spectral", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius: 3px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    var(--paper-line) 28px
+  );
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sheet {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 24px 80px;
+}
+
+/* ---------------------------------------------------------------
+   Masthead
+----------------------------------------------------------------- */
+.masthead {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 20px;
+  margin-bottom: 36px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+}
+
+.masthead h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(32px, 6vw, 44px);
+  margin: 0 0 12px;
+  letter-spacing: -0.01em;
+}
+
+.subhead {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-soft);
+  margin: 0;
+  max-width: 52ch;
+}
+
+/* ---------------------------------------------------------------
+   Entry form
+----------------------------------------------------------------- */
+.entry {
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-line);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 40px;
+}
+
+#analyze-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.field {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-narrow {
+  flex: 0 1 120px;
+}
+
+label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.hint {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink-faint);
+}
+
+input[type="text"],
+input[type="number"] {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--ink-faint);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.stamp-btn {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 11px 22px;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.stamp-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.stamp-btn:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.stamp-btn:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.status {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 14px 0 0;
+  min-height: 1em;
+}
+
+.status[data-tone="error"] {
+  color: var(--stamp-short);
+}
+
+/* ---------------------------------------------------------------
+   Results
+----------------------------------------------------------------- */
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.context-note {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-soft);
+  border-left: 2px solid var(--paper-line);
+  padding-left: 14px;
+  margin: 0 0 4px;
+}
+
+.mock-flag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+  border: 1px dashed var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  margin-bottom: 14px;
+}
+
+/* Trade ticket card */
+.ticket {
+  position: relative;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  overflow: hidden;
+}
+
+.ticket-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ticket-symbol {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: 0.02em;
+}
+
+.ticket-rank {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* Signature element: the ink-stamp direction badge */
+.stamp {
+  position: absolute;
+  top: 18px;
+  right: -6px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 5px 16px;
+  border: 2px dashed currentColor;
+  border-radius: var(--radius);
+  transform: rotate(-6deg);
+  opacity: 0.9;
+}
+
+.stamp[data-direction="long"] {
+  color: var(--stamp-long);
+}
+
+.stamp[data-direction="short"] {
+  color: var(--stamp-short);
+}
+
+.stamp[data-direction="options_spread"] {
+  color: var(--stamp-spread);
+}
+
+.confidence {
+  margin: 14px 0;
+}
+
+.confidence-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.confidence-track {
+  height: 6px;
+  background: var(--paper-line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.thesis {
+  font-size: 15px;
+  margin: 0 0 16px;
+}
+
+.agent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--stamp-long);
+  color: var(--stamp-long);
+}
+
+.tag[data-stance="dissenting"] {
+  border-style: dashed;
+  border-color: var(--stamp-short);
+  color: var(--stamp-short);
+}
+
+.risks {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+  padding-left: 18px;
+}
+
+.risks li {
+  margin-bottom: 3px;
+}
+
+/* ---------------------------------------------------------------
+   Footer
+----------------------------------------------------------------- */
+.footer {
+  margin-top: 56px;
+  padding-top: 16px;
+  border-top: 1px solid var(--paper-line);
+}
+
+.footer p {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------
+   Motion + responsiveness
+----------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .sheet {
+    padding: 36px 16px 60px;
+  }
+
+  #analyze-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stamp-btn {
+    width: 100%;
+  }
+
+  .stamp {
+    position: static;
+    display: inline-block;
+    transform: none;
+    margin-bottom: 10px;
+  }
+
+  .ticket-head {
+    flex-direction: column;
+  }
+}

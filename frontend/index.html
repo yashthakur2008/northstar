@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Debate Desk — Multi-Agent Hedge Fund Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="sheet">
+    <header class="masthead">
+      <p class="eyebrow">Confidential Research Memo · Phase 1 — Mock Data</p>
+      <h1>Trade Debate Desk</h1>
+      <p class="subhead">
+        Six specialist agents analyze each ticker. Bull and Bear researchers
+        debate the findings. The desk ranks the top three trades.
+      </p>
+    </header>
+
+    <section class="entry" aria-label="Run analysis">
+      <form id="analyze-form">
+        <div class="field">
+          <label for="tickers">Tickers <span class="hint">(1–5, comma separated)</span></label>
+          <input
+            id="tickers"
+            name="tickers"
+            type="text"
+            placeholder="AAPL, NVDA, MSFT"
+            autocomplete="off"
+            required
+          />
+        </div>
+        <div class="field field-narrow">
+          <label for="rounds">Debate rounds</label>
+          <input id="rounds" name="rounds" type="number" min="1" max="4" value="2" />
+        </div>
+        <button type="submit" class="stamp-btn">Run Analysis</button>
+      </form>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="results" class="results" aria-live="polite"></section>
+
+    <footer class="footer">
+      <p>
+        Research and educational tool only. Nothing produced by this desk is
+        investment advice.
+      </p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

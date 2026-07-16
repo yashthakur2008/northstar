@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: hedge-fund-analyzer
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --app-dir backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      # Unused in Phase 1 (mocked data). Set these in the Render dashboard
+      # ahead of Phase 2 so they're ready when the agent pipeline is wired in.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NEWSAPI_KEY
+        sync: false
