@@ -17,7 +17,7 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def _period_metrics(snapshot: MarketSnapshot, sessions: int) -> tuple[float, float, float]:
+def _period_metrics(snapshot: MarketSnapshot, sessions: int) -> tuple[float, float, float, float, float]:
     prices = snapshot.prices[-(sessions + 1):]
     period_return = ((prices[-1] / prices[0]) - 1) * 100
     peak = prices[0]
@@ -34,7 +34,10 @@ def _period_metrics(snapshot: MarketSnapshot, sessions: int) -> tuple[float, flo
         mean = sum(returns) / len(returns)
         variance = sum((value - mean) ** 2 for value in returns) / (len(returns) - 1)
         volatility = variance ** 0.5 * 252 ** 0.5 * 100
-    return period_return, volatility, max_drawdown
+    positive_days = sum(value > 0 for value in returns) / max(len(returns), 1) * 100
+    average_price = sum(prices) / len(prices)
+    trend_gap = ((prices[-1] / average_price) - 1) * 100
+    return period_return, volatility, max_drawdown, positive_days, trend_gap
 
 
 def _round_windows(snapshot: MarketSnapshot, rounds: int) -> list[int]:
@@ -61,44 +64,73 @@ def _debate(snapshot: MarketSnapshot, rounds: int, start: int) -> list[DebateMes
     seq = start + 2
     lenses = ("Momentum", "Drawdown", "Risk-adjusted trend")
     for round_number, sessions in enumerate(_round_windows(snapshot, rounds), start=1):
-        period_return, period_volatility, max_drawdown = _period_metrics(snapshot, sessions)
+        period_return, period_volatility, max_drawdown, positive_days, trend_gap = _period_metrics(snapshot, sessions)
         lens = lenses[(round_number - 1) % len(lenses)]
         if lens == "Momentum":
             bull = (
                 f"Round {round_number} · {lens}: the {sessions}-session return is {period_return:+.1f}%. "
-                f"{'Price persistence supports the setup.' if period_return >= 0 else 'A reversal would create recovery optionality, but it is not confirmed.'}"
+                f"Advances occurred on {positive_days:.0f}% of sessions and price sits {trend_gap:+.1f}% versus "
+                f"its window average. {'Breadth supports persistence.' if positive_days >= 50 else 'The case depends on a reversal broadening beyond a few sessions.'}"
             )
             bear = (
-                f"Round {round_number} · {lens} challenge: the same window carries {period_volatility:.1f}% "
-                "annualized volatility, so direction alone may overstate conviction."
+                f"Round {round_number} · {lens} rebuttal: {positive_days:.0f}% positive sessions do not establish "
+                f"durability while annualized volatility is {period_volatility:.1f}% and maximum drawdown reached "
+                f"{max_drawdown:.1f}%. The Bull case fails if breadth falls below 50% as price loses its window average."
             )
         elif lens == "Drawdown":
             bull = (
                 f"Round {round_number} · {lens}: the {sessions}-session path returned {period_return:+.1f}% "
-                f"with a maximum drawdown of {max_drawdown:.1f}%; resilience improves if drawdown remains contained."
+                f"after a {max_drawdown:.1f}% maximum drawdown. Price is now {trend_gap:+.1f}% versus its average, "
+                "so stabilization above that reference would show that sellers are being absorbed."
             )
             bear = (
-                f"Round {round_number} · {lens} challenge: a {max_drawdown:.1f}% peak-to-trough decline "
-                "defines the loss path the thesis must survive."
+                f"Round {round_number} · {lens} rebuttal: the {max_drawdown:.1f}% peak-to-trough decline and "
+                f"{period_volatility:.1f}% volatility define a loss path that the {period_return:+.1f}% return has "
+                f"{'repaired' if period_return > abs(max_drawdown) else 'not repaired'}. A fresh low invalidates stabilization."
             )
         else:
             reward_to_risk = period_return / max(period_volatility, 1.0)
             bull = (
                 f"Round {round_number} · {lens}: {period_return:+.1f}% over {sessions} sessions versus "
-                f"{period_volatility:.1f}% volatility gives a {reward_to_risk:+.2f} return-to-risk reading."
+                f"{period_volatility:.1f}% volatility gives a {reward_to_risk:+.2f} return-to-risk reading; "
+                f"price is {trend_gap:+.1f}% from its average with {positive_days:.0f}% positive sessions."
             )
             bear = (
-                f"Round {round_number} · {lens} challenge: the {reward_to_risk:+.2f} reading must improve "
-                "before price action alone supports higher conviction."
+                f"Round {round_number} · {lens} rebuttal: the {reward_to_risk:+.2f} reading is not compelling "
+                f"unless return improves without volatility rising above {period_volatility:.1f}%. "
+                "More upside accompanied by wider swings would be lower-quality evidence."
             )
+        evidence_state = (
+            "leans Bull" if period_return > 0 and trend_gap > 0 and positive_days >= 50
+            else "leans Bear" if period_return < 0 and trend_gap < 0
+            else "remains mixed"
+        )
+        daily_risk = period_volatility / 252 ** 0.5
+        confirm_level = snapshot.last * (1 + daily_risk / 100)
+        invalidate_level = snapshot.last * (1 - daily_risk / 100)
+        risk = (
+            f"Round {round_number} · Risk adjudication: evidence {evidence_state}. A close above "
+            f"${confirm_level:,.2f} with positive-session breadth at or above 50% strengthens the Bull case; "
+            f"a close below ${invalidate_level:,.2f} or a new {sessions}-session low strengthens the Bear case. "
+            "These are monitoring thresholds, not price targets."
+        )
         messages.extend([
             DebateMessage(sequence=seq, symbol=symbol, agent="Bull", stance="bull", round=round_number, message=bull),
             DebateMessage(sequence=seq + 1, symbol=symbol, agent="Bear", stance="bear", round=round_number, message=bear),
+            DebateMessage(sequence=seq + 2, symbol=symbol, agent="Risk", stance="risk", round=round_number, message=risk),
         ])
-        seq += 2
+        seq += 3
+    round_returns = [_period_metrics(snapshot, window)[0] for window in _round_windows(snapshot, rounds)]
+    positive_rounds = sum(value > 0 for value in round_returns)
+    negative_rounds = sum(value < 0 for value in round_returns)
     messages.append(DebateMessage(
         sequence=seq, symbol=symbol, agent="Risk", stance="risk",
-        message="Applied a volatility and evidence-quality haircut; no fundamental, valuation, news, borrow or options claims were inferred from price data.",
+        message=(
+            f"Final risk synthesis: {positive_rounds} of {rounds} windows were positive and "
+            f"{negative_rounds} were negative; full-period volatility is {volatility:.1f}%. "
+            "Conviction is reduced for disagreement and for missing fundamental, valuation, catalyst, liquidity, "
+            "borrow and options evidence. Treat the result as a screen until those gaps are closed."
+        ),
     ))
     return messages
 

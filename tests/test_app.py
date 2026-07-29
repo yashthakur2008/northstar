@@ -42,8 +42,9 @@ async def test_engine_is_deterministic_and_traced() -> None:
     assert report.debate[-1].agent == "Portfolio Manager"
     assert all(item.source for item in report.top_trades[0].evidence)
     round_messages = [event.message for event in report.debate if event.round]
-    assert len(round_messages) == 4
-    assert len(set(round_messages)) == 4
+    assert len(round_messages) == 6
+    assert len(set(round_messages)) == 6
+    assert [event.agent for event in report.debate if event.round][:3] == ["Bull", "Bear", "Risk"]
 
 
 async def test_engine_withholds_when_source_fails() -> None:
@@ -77,9 +78,12 @@ async def test_resilient_provider_falls_back() -> None:
 async def test_thirty_rounds_are_distinct_and_complete() -> None:
     report = await AnalysisEngine(StubProvider()).analyze(AnalyzeRequest(tickers=["TEST"], debate_rounds=30))
     bull_messages = [event.message for event in report.debate if event.agent == "Bull"]
+    risk_messages = [event.message for event in report.debate if event.agent == "Risk" and event.round]
     assert len(bull_messages) == 30
     assert len(set(bull_messages)) == 30
-    assert len(report.debate) == 64
+    assert len(risk_messages) == 30
+    assert all("monitoring thresholds" in message for message in risk_messages)
+    assert len(report.debate) == 94
 
 
 def StubProviderSnapshot(symbol: str) -> MarketSnapshot:

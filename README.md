@@ -13,6 +13,7 @@ Manager verdict as a streamed event sequence.
 - Confidence caps and explicit evidence limitations
 - Server-Sent Events (SSE) for the live agent room
 - Configurable 1–30 round research with distinct rolling windows and risk lenses
+- Three-way Bull → Bear rebuttal → Risk adjudication in every round
 - Live stage progress and explicit cross-stock conviction ranking
 - Interactive, source-attributed 1M/3M price charts with pointer and keyboard inspection
 - Context-aware guided Help tour for every major research surface
