@@ -10,7 +10,7 @@ import asyncio
 from datetime import datetime, timezone
 
 from models import AnalysisReport, AnalyzeRequest, DebateMessage, Evidence, TradeIdea
-from providers import MarketDataError, MarketSnapshot, YahooMarketData
+from providers import MarketDataProvider, MarketSnapshot, ResilientMarketData
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -92,8 +92,8 @@ def _judge(snapshot: MarketSnapshot, messages: list[DebateMessage]) -> TradeIdea
 
 
 class AnalysisEngine:
-    def __init__(self, provider: YahooMarketData | None = None) -> None:
-        self.provider = provider or YahooMarketData()
+    def __init__(self, provider: MarketDataProvider | None = None) -> None:
+        self.provider = provider or ResilientMarketData()
 
     async def analyze(self, request: AnalyzeRequest) -> AnalysisReport:
         outcomes = await asyncio.gather(*(self.provider.fetch(symbol) for symbol in request.tickers), return_exceptions=True)

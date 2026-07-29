@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -18,6 +19,10 @@ from models import AnalysisReport, AnalyzeRequest
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 engine = AnalysisEngine()
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 app = FastAPI(title="Trade Debate Desk API", version="1.0.0", docs_url="/api/docs", redoc_url=None)
 
@@ -30,7 +35,7 @@ if allowed_origins:
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "version": app.version}
+    return {"status": "ok", "version": app.version, "market_data": "Yahoo Finance with Nasdaq fallback"}
 
 
 @app.post("/api/analyze", response_model=AnalysisReport)

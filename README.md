@@ -8,7 +8,7 @@ Manager verdict as a streamed event sequence.
 ## Capabilities
 
 - Concurrent analysis for 1–5 validated ticker symbols
-- Live, source-labeled daily price history with strict timeouts
+- Live, source-labeled daily price history with strict timeouts and provider failover
 - Deterministic momentum scoring and realized-volatility adjustment
 - Confidence caps and explicit evidence limitations
 - Server-Sent Events (SSE) for the live agent room
@@ -30,7 +30,8 @@ Yahoo chart API → Market Data → Technical signal
                                 → SSE stream + typed report
 ```
 
-`backend/providers.py` owns external data and provenance. `backend/engine.py`
+`backend/providers.py` owns external data, Yahoo → Nasdaq failover, caching,
+and provenance. `backend/engine.py`
 owns the deterministic pipeline. `backend/models.py` is the API contract.
 
 ## Run locally
@@ -54,7 +55,7 @@ Open <http://localhost:8000>; API docs are at <http://localhost:8000/api/docs>.
 {"tickers": ["NVDA", "MSFT"], "debate_rounds": 2}
 ```
 
-The current Yahoo Finance chart adapter needs no key. Set `ALLOWED_ORIGINS` only
+The Yahoo Finance adapter and Nasdaq fallback need no key. Set `ALLOWED_ORIGINS` only
 for a separately hosted frontend (comma-separated exact origins). Same-origin
 deployment intentionally adds no CORS middleware. The service fails closed when
 market data is unavailable and issues no synthetic prediction.

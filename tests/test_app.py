@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from engine import AnalysisEngine
 from main import app
 from models import AnalyzeRequest
-from providers import MarketDataError, MarketSnapshot, YahooMarketData
+from providers import MarketDataError, MarketSnapshot, ResilientMarketData, YahooMarketData
 
 
 class StubProvider:
@@ -15,7 +15,7 @@ class StubProvider:
 
 class FailedProvider:
     async def fetch(self, symbol: str) -> MarketSnapshot:
-        raise MarketDataError("offline")
+        raise MarketDataError("Test provider", symbol, "offline")
 
 
 def test_health() -> None:
@@ -60,6 +60,12 @@ async def test_provider_cache_avoids_duplicate_calls() -> None:
     await provider.fetch("TEST")
     await provider.fetch("TEST")
     assert calls == 1
+
+
+async def test_resilient_provider_falls_back() -> None:
+    provider = ResilientMarketData(providers=(FailedProvider(), StubProvider()))
+    snapshot = await provider.fetch("TEST")
+    assert snapshot.source == "Test fixture"
 
 
 def StubProviderSnapshot(symbol: str) -> MarketSnapshot:

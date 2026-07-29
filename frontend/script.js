@@ -38,6 +38,12 @@ function renderReport(report) {
   sourceBadge.dataset.status = report.source_status;
   runMeta.textContent = `${report.top_trades.length} scored · ${new Date(report.generated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
   methodology.textContent = `${report.methodology} ${report.market_context}`;
+  const system = document.querySelector(".system");
+  if (system) {
+    system.innerHTML = report.source_status === "unavailable"
+      ? `<span class="pulse pulse-warn"></span> Market data unavailable`
+      : `<span class="pulse"></span> Research systems operational`;
+  }
 
   if (!report.top_trades.length) {
     resultsEl.innerHTML = `<div class="empty"><strong>No prediction issued</strong><p>Market data could not be validated. Try again shortly or verify the symbols.</p></div>`;
