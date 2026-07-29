@@ -1,4 +1,4 @@
-# Multi-Agent Hedge Fund Analyzer
+# NorthStar - The Multi-Agent Hedge Fund Analyzer
 
 Phase 1 skeleton: a real FastAPI backend + static frontend, deployable to
 Render on day one, with `/api/analyze` returning mocked data shaped exactly
