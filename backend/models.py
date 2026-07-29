@@ -1,34 +1,67 @@
-"""
-Pydantic schemas shared by the API and (eventually) the LangGraph agent
-pipeline. This file is the contract between backend and frontend — treat
-any field change here as a breaking change.
-"""
+"""Typed API contract for analysis, evidence and the agent debate."""
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+TICKER_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
 
 class AnalyzeRequest(BaseModel):
     tickers: list[str] = Field(..., min_length=1, max_length=5)
     debate_rounds: int = Field(default=2, ge=1, le=4)
 
+    @field_validator("tickers")
+    @classmethod
+    def normalize_tickers(cls, values: list[str]) -> list[str]:
+        normalized = list(dict.fromkeys(value.strip().upper() for value in values))
+        if not normalized or any(not TICKER_RE.fullmatch(value) for value in normalized):
+            raise ValueError("Use 1–5 valid ticker symbols (letters, numbers, dot or hyphen).")
+        return normalized
+
+
+class Evidence(BaseModel):
+    label: str
+    value: str
+    source: str
+    as_of: datetime
+
+
+class DebateMessage(BaseModel):
+    sequence: int
+    symbol: str
+    agent: Literal["Market Data", "Technical", "Bull", "Bear", "Risk", "Portfolio Manager"]
+    stance: Literal["process", "bull", "bear", "risk", "decision"]
+    message: str
+    round: int | None = None
+
 
 class TradeIdea(BaseModel):
     symbol: str
-    direction: Literal["long", "short", "options_spread"]
+    direction: Literal["long", "short", "watch"]
+    actionability: Literal["candidate", "watchlist", "pass"]
     thesis: str
     confidence: float = Field(ge=0.0, le=1.0)
+    score: float = Field(ge=-100.0, le=100.0)
+    last_price: float | None = None
+    change_pct: float | None = None
+    horizon: str = "1–3 months"
     key_risks: list[str]
     supporting_agents: list[str]
     dissenting_agents: list[str]
+    evidence: list[Evidence] = Field(default_factory=list)
+    data_quality: Literal["live", "delayed", "unavailable"] = "unavailable"
 
 
 class AnalysisReport(BaseModel):
     top_trades: list[TradeIdea]
+    debate: list[DebateMessage]
     market_context: str
     generated_at: datetime
+    methodology: str
+    source_status: Literal["live", "partial", "unavailable"]
     is_mocked: bool = False

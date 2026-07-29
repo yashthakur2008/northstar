@@ -1,51 +1,53 @@
-"""
-FastAPI backend for the Multi-Agent Hedge Fund Analyzer.
-
-Phase 1: serves the static frontend and a mocked /api/analyze response so
-the whole thing is deployable to Render on day one. Phase 2 replaces the
-body of `analyze()` with a call into the LangGraph agent pipeline — the
-route, request/response schema, and frontend do not need to change.
-"""
+"""FastAPI entrypoint for the multi-agent research desk."""
 
 from __future__ import annotations
 
+import asyncio
+import json
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from mock_data import generate_mock_report
+from engine import AnalysisEngine
 from models import AnalysisReport, AnalyzeRequest
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
+engine = AnalysisEngine()
 
-app = FastAPI(title="Multi-Agent Hedge Fund Analyzer", version="0.1.0")
+app = FastAPI(title="Trade Debate Desk API", version="1.0.0", docs_url="/api/docs", redoc_url=None)
 
-# Same-origin in this architecture (backend serves the frontend directly),
-# so this is permissive by default rather than hardened. Tighten if the
-# frontend ever moves to a separate origin/service.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+allowed_origins = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "").split(",") if origin.strip()]
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type"]
+    )
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, str]:
+    return {"status": "ok", "version": app.version}
 
 
 @app.post("/api/analyze", response_model=AnalysisReport)
-def analyze(request: AnalyzeRequest) -> AnalysisReport:
-    # Phase 1: mocked so deployment + frontend contract can be validated
-    # before the LangGraph pipeline, real data sources, and LLM calls exist.
-    return generate_mock_report(request.tickers)
+async def analyze(request: AnalyzeRequest) -> AnalysisReport:
+    return await engine.analyze(request)
 
 
-# Registered last: routes above take priority, everything else falls
-# through to the static frontend (index.html for `/`, plus its assets).
+@app.post("/api/analyze/stream")
+async def analyze_stream(request: AnalyzeRequest) -> StreamingResponse:
+    async def events():
+        yield f"event: status\ndata: {json.dumps({'message': 'Research desk opened'})}\n\n"
+        report = await engine.analyze(request)
+        for message in report.debate:
+            yield f"event: debate\ndata: {message.model_dump_json()}\n\n"
+            await asyncio.sleep(0.08)
+        yield f"event: report\ndata: {report.model_dump_json()}\n\n"
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
