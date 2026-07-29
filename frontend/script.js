@@ -9,6 +9,10 @@ const sourceBadge = document.querySelector("#source-badge");
 const runMeta = document.querySelector("#run-meta");
 const methodology = document.querySelector("#methodology");
 const themeToggle = document.querySelector("#theme-toggle");
+const analysisProgress = document.querySelector("#analysis-progress");
+const progressStage = document.querySelector("#progress-stage");
+const progressPercent = document.querySelector("#progress-percent");
+const progressFill = document.querySelector("#progress-fill");
 
 const agentInitial = {"Market Data":"M","Technical":"T","Bull":"B+","Bear":"B−","Risk":"R","Portfolio Manager":"PM"};
 const money = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:2});
@@ -52,6 +56,15 @@ function addDebate(message) {
   debateEl.appendChild(item);
   debateEl.scrollTop = debateEl.scrollHeight;
   eventCount.textContent = `${debateEl.children.length} events`;
+}
+
+function updateProgress(progress) {
+  const percent = Math.max(0, Math.min(100, Number(progress.percent) || 0));
+  analysisProgress.setAttribute("aria-valuenow", String(percent));
+  analysisProgress.dataset.complete = String(percent === 100);
+  progressStage.textContent = progress.stage || "Researching";
+  progressPercent.textContent = `${percent}%`;
+  progressFill.style.width = `${percent}%`;
 }
 
 function chartGeometry(points) {
@@ -162,7 +175,7 @@ function renderReport(report) {
   resultsEl.innerHTML = "";
   sourceBadge.textContent = report.source_status === "live" ? "Live data" : report.source_status;
   sourceBadge.dataset.status = report.source_status;
-  runMeta.textContent = `${report.top_trades.length} scored · ${new Date(report.generated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
+  runMeta.textContent = `${report.top_trades.length} ranked by conviction · ${new Date(report.generated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
   methodology.textContent = `${report.methodology} ${report.market_context}`;
   const system = document.querySelector(".system");
   if (system) {
@@ -179,7 +192,7 @@ function renderReport(report) {
     card.className = "trade";
     card.innerHTML = `
       <div class="trade-top">
-        <div><span class="rank">0${index + 1}</span><h3>${escapeHtml(trade.symbol)}</h3>
+        <div><span class="rank" title="Conviction rank">#${index + 1}</span><h3>${escapeHtml(trade.symbol)}</h3>
           <span class="direction" data-direction="${trade.direction}">${escapeHtml(trade.direction)}</span></div>
         <div class="score"><strong>${trade.score > 0 ? "+" : ""}${trade.score.toFixed(1)}</strong><span>signal score</span></div>
       </div>
@@ -219,6 +232,7 @@ async function consumeSSE(response) {
       const data = packet.match(/^data: (.+)$/m)?.[1];
       if (!data) continue;
       const payload = JSON.parse(data);
+      if (event === "progress") updateProgress(payload);
       if (event === "debate") addDebate(payload);
       if (event === "report") renderReport(payload);
     }
@@ -228,8 +242,14 @@ async function consumeSSE(response) {
 form.addEventListener("submit", async event => {
   event.preventDefault();
   const tickers = parseTickers(document.querySelector("#tickers").value);
+  const rounds = Number(document.querySelector("#rounds").value);
   if (!tickers.length || tickers.length > 5 || tickers.some(ticker => !/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker))) {
     statusEl.textContent = "Enter 1–5 valid ticker symbols.";
+    statusEl.dataset.tone = "error";
+    return;
+  }
+  if (!Number.isInteger(rounds) || rounds < 1 || rounds > 30) {
+    statusEl.textContent = "Choose between 1 and 30 whole research rounds.";
     statusEl.dataset.tone = "error";
     return;
   }
@@ -241,13 +261,14 @@ form.addEventListener("submit", async event => {
   eventCount.textContent = "0 events";
   sourceBadge.textContent = "Running";
   delete sourceBadge.dataset.status;
+  updateProgress({percent:0, stage:"Opening the research desk"});
   statusEl.textContent = "Desk in session. Follow the live room below.";
   workspace.scrollIntoView({behavior:"smooth", block:"start"});
   try {
     const response = await fetch("/api/analyze/stream", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({tickers, debate_rounds:Number(document.querySelector("#rounds").value)}),
+      body:JSON.stringify({tickers, debate_rounds:rounds}),
     });
     await consumeSSE(response);
     statusEl.textContent = "Research run complete.";
@@ -274,7 +295,7 @@ let tourIndex = 0;
 let returnFocus = null;
 
 const allTourSteps = [
-  {selector:"#analyze-form", kicker:"Start here", title:"Choose what to research", copy:"Enter up to five ticker symbols. Debate depth controls how many times the Bull and Bear challenge each other."},
+  {selector:"#analyze-form", kicker:"Start here", title:"Choose what to research", copy:"Enter up to five ticker symbols and choose 1–30 rounds. Each round tests a different time window and risk lens before the stocks are ranked."},
   {selector:".process-card", kicker:"Follow the reasoning", title:"Live agent room", copy:"This feed shows each step in order. Bull looks for upside, Bear challenges it, Risk applies safeguards, and the Portfolio Manager makes the final call."},
   {selector:".output-card", kicker:"Read the decision", title:"PM scorecard", copy:"This is the concise outcome. Direction shows the current signal, while the score measures strength—not a guaranteed return."},
   {selector:".metrics", kicker:"Understand the numbers", title:"Three useful reference points", copy:"Last close is the latest validated price. Daily move is the most recent change. Confidence is deliberately reduced when volatility or evidence risk is high."},

@@ -12,6 +12,8 @@ Manager verdict as a streamed event sequence.
 - Deterministic momentum scoring and realized-volatility adjustment
 - Confidence caps and explicit evidence limitations
 - Server-Sent Events (SSE) for the live agent room
+- Configurable 1–30 round research with distinct rolling windows and risk lenses
+- Live stage progress and explicit cross-stock conviction ranking
 - Interactive, source-attributed 1M/3M price charts with pointer and keyboard inspection
 - Context-aware guided Help tour for every major research surface
 - Persistent light/dark theme control with first-visit system preference

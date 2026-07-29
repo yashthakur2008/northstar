@@ -28,6 +28,7 @@ def test_request_validation() -> None:
     client = TestClient(app)
     assert client.post("/api/analyze", json={"tickers": ["bad ticker"]}).status_code == 422
     assert client.post("/api/analyze", json={"tickers": ["A", "B", "C", "D", "E", "F"]}).status_code == 422
+    assert client.post("/api/analyze", json={"tickers": ["A"], "debate_rounds": 31}).status_code == 422
 
 
 async def test_engine_is_deterministic_and_traced() -> None:
@@ -40,6 +41,9 @@ async def test_engine_is_deterministic_and_traced() -> None:
     assert report.top_trades[0].price_history[-1].close == 122.0
     assert report.debate[-1].agent == "Portfolio Manager"
     assert all(item.source for item in report.top_trades[0].evidence)
+    round_messages = [event.message for event in report.debate if event.round]
+    assert len(round_messages) == 4
+    assert len(set(round_messages)) == 4
 
 
 async def test_engine_withholds_when_source_fails() -> None:
@@ -68,6 +72,14 @@ async def test_resilient_provider_falls_back() -> None:
     provider = ResilientMarketData(providers=(FailedProvider(), StubProvider()))
     snapshot = await provider.fetch("TEST")
     assert snapshot.source == "Test fixture"
+
+
+async def test_thirty_rounds_are_distinct_and_complete() -> None:
+    report = await AnalysisEngine(StubProvider()).analyze(AnalyzeRequest(tickers=["TEST"], debate_rounds=30))
+    bull_messages = [event.message for event in report.debate if event.agent == "Bull"]
+    assert len(bull_messages) == 30
+    assert len(set(bull_messages)) == 30
+    assert len(report.debate) == 64
 
 
 def StubProviderSnapshot(symbol: str) -> MarketSnapshot:

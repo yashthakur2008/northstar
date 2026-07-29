@@ -46,11 +46,19 @@ async def analyze(request: AnalyzeRequest) -> AnalysisReport:
 @app.post("/api/analyze/stream")
 async def analyze_stream(request: AnalyzeRequest) -> StreamingResponse:
     async def events():
-        yield f"event: status\ndata: {json.dumps({'message': 'Research desk opened'})}\n\n"
+        yield f"event: progress\ndata: {json.dumps({'current': 0, 'total': 1, 'percent': 2, 'stage': 'Opening the research desk'})}\n\n"
         report = await engine.analyze(request)
-        for message in report.debate:
+        total = len(report.debate)
+        pacing = max(0.12, min(0.32, 8.0 / max(total, 1)))
+        for index, message in enumerate(report.debate, start=1):
+            stage = (
+                f"{message.symbol} · Round {message.round} · {message.agent}"
+                if message.round else f"{message.symbol} · {message.agent}"
+            )
+            yield f"event: progress\ndata: {json.dumps({'current': index - 1, 'total': total, 'percent': max(3, round((index - 1) / total * 96)), 'stage': stage})}\n\n"
             yield f"event: debate\ndata: {message.model_dump_json()}\n\n"
-            await asyncio.sleep(0.08)
+            await asyncio.sleep(pacing)
+        yield f"event: progress\ndata: {json.dumps({'current': total, 'total': total, 'percent': 100, 'stage': 'Ranking complete'})}\n\n"
         yield f"event: report\ndata: {report.model_dump_json()}\n\n"
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 

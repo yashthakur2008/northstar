@@ -13,7 +13,7 @@ TICKER_RE = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
 
 class AnalyzeRequest(BaseModel):
     tickers: list[str] = Field(..., min_length=1, max_length=5)
-    debate_rounds: int = Field(default=2, ge=1, le=4)
+    debate_rounds: int = Field(default=4, ge=1, le=30)
 
     @field_validator("tickers")
     @classmethod

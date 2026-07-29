@@ -49,14 +49,9 @@
           <button id="run-button" type="submit">Run desk <span>→</span></button>
         </div>
         <div class="controls">
-          <label for="rounds">Debate depth</label>
-          <select id="rounds" name="rounds">
-            <option value="1">1 round · fast</option>
-            <option value="2" selected>2 rounds · standard</option>
-            <option value="3">3 rounds · deep</option>
-            <option value="4">4 rounds · maximum</option>
-          </select>
-          <span>Up to 5 US-listed symbols</span>
+          <label for="rounds">Research rounds</label>
+          <input id="rounds" name="rounds" type="number" min="1" max="30" value="4" inputmode="numeric">
+          <span>1–30 rounds · up to 5 symbols</span>
         </div>
         <p id="status" class="status" role="status" aria-live="polite">Ready for a new mandate.</p>
       </form>
@@ -66,6 +61,10 @@
       <div class="workspace-head">
         <div><p class="kicker">Research run</p><h2>Investment committee feed</h2></div>
         <div id="run-meta" class="run-meta"></div>
+      </div>
+      <div id="analysis-progress" class="analysis-progress" role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-copy"><strong id="progress-stage">Opening the research desk</strong><span id="progress-percent">0%</span></div>
+        <div class="progress-track"><span id="progress-fill"></span></div>
       </div>
       <div class="desk-grid">
         <aside class="process-card">
@@ -96,7 +95,7 @@
       </div>
       <p id="tour-kicker" class="tour-kicker">Start here</p>
       <h2 id="tour-title">Choose what to research</h2>
-      <p id="tour-copy">Enter up to five ticker symbols and choose how many rounds the Bull and Bear agents should debate.</p>
+      <p id="tour-copy">Enter up to five ticker symbols and choose 1–30 rounds. Each round tests a different time window and risk lens.</p>
       <div class="tour-actions">
         <button id="tour-back" class="tour-back" type="button">Back</button>
         <button id="tour-next" class="tour-next" type="button">Next <span aria-hidden="true">→</span></button>

@@ -17,6 +17,37 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
+def _period_metrics(snapshot: MarketSnapshot, sessions: int) -> tuple[float, float, float]:
+    prices = snapshot.prices[-(sessions + 1):]
+    period_return = ((prices[-1] / prices[0]) - 1) * 100
+    peak = prices[0]
+    max_drawdown = 0.0
+    returns: list[float] = []
+    for index, price in enumerate(prices):
+        peak = max(peak, price)
+        max_drawdown = min(max_drawdown, ((price / peak) - 1) * 100)
+        if index:
+            returns.append((price / prices[index - 1]) - 1)
+    if len(returns) < 2:
+        volatility = 0.0
+    else:
+        mean = sum(returns) / len(returns)
+        variance = sum((value - mean) ** 2 for value in returns) / (len(returns) - 1)
+        volatility = variance ** 0.5 * 252 ** 0.5 * 100
+    return period_return, volatility, max_drawdown
+
+
+def _round_windows(snapshot: MarketSnapshot, rounds: int) -> list[int]:
+    maximum = min(len(snapshot.prices) - 1, 64)
+    minimum = min(5, maximum)
+    if rounds == 1 or maximum == minimum:
+        return [min(22, maximum)]
+    return [
+        round(minimum + (maximum - minimum) * index / (rounds - 1))
+        for index in range(rounds)
+    ]
+
+
 def _debate(snapshot: MarketSnapshot, rounds: int, start: int) -> list[DebateMessage]:
     symbol = snapshot.symbol
     momentum = snapshot.return_1m
@@ -28,18 +59,38 @@ def _debate(snapshot: MarketSnapshot, rounds: int, start: int) -> list[DebateMes
                       message=f"Measured 1-month momentum at {momentum:+.1f}% and annualized realized volatility at {volatility:.1f}%."),
     ]
     seq = start + 2
-    for round_number in range(1, rounds + 1):
-        bull = (
-            f"Round {round_number}: price persistence is constructive ({momentum:+.1f}% over one month). "
-            "The setup remains valid while momentum holds and fresh evidence confirms the move."
-            if momentum >= 0 else
-            f"Round {round_number}: the {momentum:.1f}% one-month decline may offer asymmetric recovery, "
-            "but reversal evidence is still required."
-        )
-        bear = (
-            f"Round {round_number}: {volatility:.1f}% realized volatility can overwhelm the signal; "
-            "a momentum reversal is the primary disconfirming condition."
-        )
+    lenses = ("Momentum", "Drawdown", "Risk-adjusted trend")
+    for round_number, sessions in enumerate(_round_windows(snapshot, rounds), start=1):
+        period_return, period_volatility, max_drawdown = _period_metrics(snapshot, sessions)
+        lens = lenses[(round_number - 1) % len(lenses)]
+        if lens == "Momentum":
+            bull = (
+                f"Round {round_number} · {lens}: the {sessions}-session return is {period_return:+.1f}%. "
+                f"{'Price persistence supports the setup.' if period_return >= 0 else 'A reversal would create recovery optionality, but it is not confirmed.'}"
+            )
+            bear = (
+                f"Round {round_number} · {lens} challenge: the same window carries {period_volatility:.1f}% "
+                "annualized volatility, so direction alone may overstate conviction."
+            )
+        elif lens == "Drawdown":
+            bull = (
+                f"Round {round_number} · {lens}: the {sessions}-session path returned {period_return:+.1f}% "
+                f"with a maximum drawdown of {max_drawdown:.1f}%; resilience improves if drawdown remains contained."
+            )
+            bear = (
+                f"Round {round_number} · {lens} challenge: a {max_drawdown:.1f}% peak-to-trough decline "
+                "defines the loss path the thesis must survive."
+            )
+        else:
+            reward_to_risk = period_return / max(period_volatility, 1.0)
+            bull = (
+                f"Round {round_number} · {lens}: {period_return:+.1f}% over {sessions} sessions versus "
+                f"{period_volatility:.1f}% volatility gives a {reward_to_risk:+.2f} return-to-risk reading."
+            )
+            bear = (
+                f"Round {round_number} · {lens} challenge: the {reward_to_risk:+.2f} reading must improve "
+                "before price action alone supports higher conviction."
+            )
         messages.extend([
             DebateMessage(sequence=seq, symbol=symbol, agent="Bull", stance="bull", round=round_number, message=bull),
             DebateMessage(sequence=seq + 1, symbol=symbol, agent="Bear", stance="bear", round=round_number, message=bear),
@@ -52,10 +103,12 @@ def _debate(snapshot: MarketSnapshot, rounds: int, start: int) -> list[DebateMes
     return messages
 
 
-def _judge(snapshot: MarketSnapshot, messages: list[DebateMessage]) -> TradeIdea:
+def _judge(snapshot: MarketSnapshot, messages: list[DebateMessage], rounds: int) -> TradeIdea:
     momentum = snapshot.return_1m
     vol = snapshot.volatility
-    raw_score = _clamp(momentum * 3.0, -80, 80)
+    round_returns = [_period_metrics(snapshot, window)[0] for window in _round_windows(snapshot, rounds)]
+    multi_horizon = sum(round_returns) / len(round_returns)
+    raw_score = _clamp((momentum * 2.0) + multi_horizon, -80, 80)
     risk_haircut = _clamp((vol - 20) * 0.35, 0, 22)
     score = raw_score - risk_haircut if raw_score >= 0 else raw_score + risk_haircut
     score = round(_clamp(score, -100, 100), 1)
@@ -68,7 +121,8 @@ def _judge(snapshot: MarketSnapshot, messages: list[DebateMessage]) -> TradeIdea
     confidence = round(_clamp(0.45 + abs(score) / 200 - vol / 600, 0.25, 0.82), 2)
     stance = "positive" if direction == "long" else "negative" if direction == "short" else "inconclusive"
     thesis = (
-        f"Screen-grade {stance} setup: {snapshot.return_1m:+.1f}% one-month price momentum, "
+        f"Screen-grade {stance} setup: {snapshot.return_1m:+.1f}% one-month momentum and "
+        f"{multi_horizon:+.1f}% average return across {rounds} research window{'s' if rounds != 1 else ''}, "
         f"tempered by {vol:.1f}% realized volatility. Upgrade conviction only after "
         "fundamental, valuation and catalyst evidence corroborates the signal."
     )
@@ -118,7 +172,7 @@ class AnalysisEngine:
                 continue
             symbol_debate = _debate(outcome, request.debate_rounds, sequence)
             debate.extend(symbol_debate)
-            trade = _judge(outcome, symbol_debate)
+            trade = _judge(outcome, symbol_debate, request.debate_rounds)
             sequence = symbol_debate[-1].sequence + 1
             debate.append(DebateMessage(
                 sequence=sequence, symbol=symbol, agent="Portfolio Manager", stance="decision",
@@ -126,7 +180,7 @@ class AnalysisEngine:
             ))
             sequence += 1
             trades.append(trade)
-        trades.sort(key=lambda item: abs(item.score), reverse=True)
+        trades.sort(key=lambda item: (abs(item.score), item.confidence), reverse=True)
         status = "live" if trades and not failed else "partial" if trades else "unavailable"
         failed_note = f" Data unavailable for {', '.join(failed)}." if failed else ""
         return AnalysisReport(
@@ -134,7 +188,7 @@ class AnalysisEngine:
             debate=debate,
             market_context="Screen-grade market analysis using recent daily prices; not a full investment recommendation." + failed_note,
             generated_at=datetime.now(timezone.utc),
-            methodology="Momentum signal × 3, capped at ±80, with a realized-volatility haircut. Confidence is capped at 82% and reduced for volatility and missing evidence.",
+            methodology="Conviction ranking blends one-month momentum with the average return across every round's distinct rolling window, then applies a realized-volatility haircut. Confidence is capped at 82%.",
             source_status=status,
             is_mocked=False,
         )
