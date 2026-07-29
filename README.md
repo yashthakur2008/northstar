@@ -14,6 +14,7 @@ Manager verdict as a streamed event sequence.
 - Server-Sent Events (SSE) for the live agent room
 - Interactive, source-attributed 1M/3M price charts with pointer and keyboard inspection
 - Context-aware guided Help tour for every major research surface
+- Persistent light/dark theme control with first-visit system preference
 - Typed contracts, same-origin security defaults, health check, and API docs
 - Responsive dashboard with loading, partial-data, and failure states
 

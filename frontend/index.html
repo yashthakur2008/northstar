@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Observable multi-agent public-equity research desk">
   <title>Northstar — Trade Debate Desk</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("northstar-theme");
+        const theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch (_) {}
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
@@ -17,6 +27,10 @@
       <div class="system"><span class="pulse"></span> Research systems operational</div>
       <button id="help-button" class="help-button" type="button" aria-label="Open guided help">
         <span aria-hidden="true">?</span> Help
+      </button>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+        <span class="theme-icon" aria-hidden="true">☾</span>
+        <span class="theme-label">Dark</span>
       </button>
     </div>
   </header>
