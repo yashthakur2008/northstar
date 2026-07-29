@@ -323,14 +323,6 @@ function positionTour() {
     tourFocus.style.top = `${Math.max(gap, rect.top - gap)}px`;
     tourFocus.style.width = `${Math.min(window.innerWidth - gap * 2, rect.width + gap * 2)}px`;
     tourFocus.style.height = `${Math.min(window.innerHeight - gap * 2, rect.height + gap * 2)}px`;
-    const cardWidth = Math.min(360, window.innerWidth - 32);
-    const preferRight = rect.right + cardWidth + 24 < window.innerWidth;
-    const left = preferRight ? rect.right + 18 : Math.max(16, Math.min(rect.left, window.innerWidth - cardWidth - 16));
-    const below = rect.bottom + 260 < window.innerHeight;
-    const top = below ? rect.bottom + 18 : Math.max(16, Math.min(rect.top - 250, window.innerHeight - 250));
-    tourCard.style.left = `${left}px`;
-    tourCard.style.top = `${top}px`;
-    tourCard.style.width = `${cardWidth}px`;
   });
 }
 
