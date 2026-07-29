@@ -36,6 +36,14 @@ class PricePoint(BaseModel):
     close: float = Field(gt=0)
 
 
+class DebateScorePoint(BaseModel):
+    round: int = Field(ge=1, le=30)
+    bull: float = Field(ge=0, le=100)
+    bear: float = Field(ge=0, le=100)
+    net: float = Field(ge=-100, le=100)
+    lens: str
+
+
 class DebateMessage(BaseModel):
     sequence: int
     symbol: str
@@ -60,6 +68,7 @@ class TradeIdea(BaseModel):
     dissenting_agents: list[str]
     evidence: list[Evidence] = Field(default_factory=list)
     price_history: list[PricePoint] = Field(default_factory=list)
+    debate_scores: list[DebateScorePoint] = Field(default_factory=list)
     data_quality: Literal["live", "delayed", "unavailable"] = "unavailable"
 
 

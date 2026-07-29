@@ -39,6 +39,9 @@ async def test_engine_is_deterministic_and_traced() -> None:
     assert report.top_trades[0].confidence <= 0.82
     assert len(report.top_trades[0].price_history) == 45
     assert report.top_trades[0].price_history[-1].close == 122.0
+    assert len(report.top_trades[0].debate_scores) == 2
+    assert all(point.bull + point.bear == 100 for point in report.top_trades[0].debate_scores)
+    assert all(-100 <= point.net <= 100 for point in report.top_trades[0].debate_scores)
     assert report.debate[-1].agent == "Portfolio Manager"
     assert all(item.source for item in report.top_trades[0].evidence)
     round_messages = [event.message for event in report.debate if event.round]
@@ -82,6 +85,7 @@ async def test_thirty_rounds_are_distinct_and_complete() -> None:
     assert len(bull_messages) == 30
     assert len(set(bull_messages)) == 30
     assert len(risk_messages) == 30
+    assert len(report.top_trades[0].debate_scores) == 30
     assert all("monitoring thresholds" in message for message in risk_messages)
     assert len(report.debate) == 94
 

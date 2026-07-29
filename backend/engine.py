@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 
-from models import AnalysisReport, AnalyzeRequest, DebateMessage, Evidence, PricePoint, TradeIdea
+from models import AnalysisReport, AnalyzeRequest, DebateMessage, DebateScorePoint, Evidence, PricePoint, TradeIdea
 from providers import MarketDataProvider, MarketSnapshot, ResilientMarketData
 
 
@@ -49,6 +49,26 @@ def _round_windows(snapshot: MarketSnapshot, rounds: int) -> list[int]:
         round(minimum + (maximum - minimum) * index / (rounds - 1))
         for index in range(rounds)
     ]
+
+
+def _debate_scores(snapshot: MarketSnapshot, rounds: int) -> list[DebateScorePoint]:
+    lenses = ("Momentum", "Drawdown", "Risk-adjusted trend")
+    scores: list[DebateScorePoint] = []
+    for round_number, sessions in enumerate(_round_windows(snapshot, rounds), start=1):
+        period_return, volatility, max_drawdown, positive_days, trend_gap = _period_metrics(snapshot, sessions)
+        breadth = (positive_days - 50) * 0.45
+        drawdown_penalty = abs(max_drawdown) * 0.8
+        volatility_penalty = max(volatility - 25, 0) * 0.12
+        net = _clamp(period_return * 2.2 + trend_gap * 1.3 + breadth - drawdown_penalty - volatility_penalty, -90, 90)
+        bull = round(_clamp(50 + net / 2, 5, 95), 1)
+        scores.append(DebateScorePoint(
+            round=round_number,
+            bull=bull,
+            bear=round(100 - bull, 1),
+            net=round(net, 1),
+            lens=lenses[(round_number - 1) % len(lenses)],
+        ))
+    return scores
 
 
 def _debate(snapshot: MarketSnapshot, rounds: int, start: int) -> list[DebateMessage]:
@@ -181,7 +201,7 @@ def _judge(snapshot: MarketSnapshot, messages: list[DebateMessage], rounds: int)
         confidence=confidence, score=score, last_price=round(snapshot.last, 2),
         change_pct=round(snapshot.change_pct, 2), key_risks=risks,
         supporting_agents=supporters, dissenting_agents=dissenters, evidence=evidence,
-        price_history=price_history, data_quality="live",
+        price_history=price_history, debate_scores=_debate_scores(snapshot, rounds), data_quality="live",
     )
 
 

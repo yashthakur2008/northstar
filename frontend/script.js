@@ -171,6 +171,71 @@ function renderPriceChart(container, trade, requestedRange = "3M") {
   });
 }
 
+function renderDebateChart(container, trade) {
+  const points = trade.debate_scores || [];
+  if (!points.length) {
+    container.hidden = true;
+    return;
+  }
+  const width = 600;
+  const height = 180;
+  const pad = {top:22, right:18, bottom:34, left:42};
+  const x = index => pad.left + (index / Math.max(points.length - 1, 1)) * (width - pad.left - pad.right);
+  const y = value => pad.top + ((100 - value) / 100) * (height - pad.top - pad.bottom);
+  const bullLine = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(2)},${y(point.bull).toFixed(2)}`).join(" ");
+  const bearLine = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(2)},${y(point.bear).toFixed(2)}`).join(" ");
+  const latest = points.at(-1);
+
+  container.innerHTML = `
+    <div class="debate-chart-head">
+      <div><span>Decision path</span><strong>Round-by-round evidence balance</strong></div>
+      <div class="debate-legend"><span data-series="bull">Bull ${latest.bull.toFixed(0)}</span><span data-series="bear">Bear ${latest.bear.toFixed(0)}</span></div>
+    </div>
+    <div class="debate-chart-stage">
+      <svg class="debate-chart" viewBox="0 0 ${width} ${height}" role="img" tabindex="0"
+        aria-label="${escapeHtml(trade.symbol)} Bull and Bear evidence balance across ${points.length} rounds. Latest Bull ${latest.bull.toFixed(0)}, Bear ${latest.bear.toFixed(0)}.">
+        ${[75, 50, 25].map(value => `<line class="debate-grid${value === 50 ? " midpoint" : ""}" x1="${pad.left}" x2="${width - pad.right}" y1="${y(value)}" y2="${y(value)}"/><text class="axis-label" x="${pad.left - 8}" y="${y(value) + 3}" text-anchor="end">${value}</text>`).join("")}
+        <path class="debate-line bull-line" d="${bullLine}"/>
+        <path class="debate-line bear-line" d="${bearLine}"/>
+        ${points.map((point, index) => `<circle class="debate-node bull-node" cx="${x(index)}" cy="${y(point.bull)}" r="3" data-index="${index}"/><circle class="debate-node bear-node" cx="${x(index)}" cy="${y(point.bear)}" r="3" data-index="${index}"/>`).join("")}
+        <rect class="debate-hit" x="${pad.left}" y="${pad.top}" width="${width - pad.left - pad.right}" height="${height - pad.top - pad.bottom}"/>
+      </svg>
+      <div class="debate-tooltip" hidden><strong></strong><span></span><small></small></div>
+    </div>
+    <p class="chart-source">Evidence balance (0–100) derived from return, breadth, trend, drawdown and volatility. It is not a probability or price forecast.</p>`;
+
+  const svg = container.querySelector(".debate-chart");
+  const tooltip = container.querySelector(".debate-tooltip");
+  function showRound(index) {
+    const safeIndex = Math.max(0, Math.min(points.length - 1, index));
+    const point = points[safeIndex];
+    tooltip.querySelector("strong").textContent = `Round ${point.round} · ${point.lens}`;
+    tooltip.querySelector("span").textContent = `Bull ${point.bull.toFixed(1)} · Bear ${point.bear.toFixed(1)}`;
+    tooltip.querySelector("small").textContent = `Net tilt ${point.net >= 0 ? "+" : ""}${point.net.toFixed(1)}`;
+    tooltip.style.left = `${(x(safeIndex) / width) * 100}%`;
+    tooltip.style.top = `${Math.max(7, (Math.min(y(point.bull), y(point.bear)) / height) * 100)}%`;
+    tooltip.hidden = false;
+    svg.dataset.activeIndex = String(safeIndex);
+    svg.querySelectorAll(".debate-node").forEach(node => node.classList.toggle("active", Number(node.dataset.index) === safeIndex));
+  }
+  svg.addEventListener("pointermove", event => {
+    const bounds = svg.getBoundingClientRect();
+    const relativeX = ((event.clientX - bounds.left) / bounds.width) * width;
+    const ratio = (relativeX - pad.left) / (width - pad.left - pad.right);
+    showRound(Math.round(Math.max(0, Math.min(1, ratio)) * (points.length - 1)));
+  });
+  svg.addEventListener("pointerleave", () => {
+    tooltip.hidden = true;
+    svg.querySelectorAll(".debate-node").forEach(node => node.classList.remove("active"));
+  });
+  svg.addEventListener("keydown", event => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const current = Number(svg.dataset.activeIndex ?? points.length - 1);
+    showRound(current + (event.key === "ArrowRight" ? 1 : -1));
+  });
+}
+
 function renderReport(report) {
   resultsEl.innerHTML = "";
   sourceBadge.textContent = report.source_status === "live" ? "Live data" : report.source_status;
@@ -187,29 +252,46 @@ function renderReport(report) {
     resultsEl.innerHTML = `<div class="empty"><strong>No prediction issued</strong><p>Market data could not be validated. Try again shortly or verify the symbols.</p></div>`;
     return;
   }
+  const hasMultiple = report.top_trades.length > 1;
   report.top_trades.forEach((trade, index) => {
     const card = document.createElement("article");
     card.className = "trade";
+    card.dataset.rank = String(index + 1);
+    const expanded = !hasMultiple || index === 0;
     card.innerHTML = `
       <div class="trade-top">
-        <div><span class="rank" title="Conviction rank">#${index + 1}</span><h3>${escapeHtml(trade.symbol)}</h3>
+        <div><span class="rank" title="Conviction rank">#${index + 1}${index === 0 ? " · TOP" : ""}</span><h3>${escapeHtml(trade.symbol)}</h3>
           <span class="direction" data-direction="${trade.direction}">${escapeHtml(trade.direction)}</span></div>
-        <div class="score"><strong>${trade.score > 0 ? "+" : ""}${trade.score.toFixed(1)}</strong><span>signal score</span></div>
+        <div class="trade-actions">
+          <div class="score"><strong>${trade.score > 0 ? "+" : ""}${trade.score.toFixed(1)}</strong><span>signal score</span></div>
+          ${hasMultiple ? `<button class="trade-expand" type="button" aria-expanded="${expanded}">${expanded ? "Condense" : "View analysis"}</button>` : ""}
+        </div>
       </div>
       <div class="metrics">
         <div><span>Last close</span><strong>${trade.last_price == null ? "—" : money.format(trade.last_price)}</strong></div>
         <div><span>Daily move</span><strong class="${trade.change_pct >= 0 ? "positive" : "negative"}">${trade.change_pct == null ? "—" : `${trade.change_pct > 0 ? "+" : ""}${trade.change_pct.toFixed(2)}%`}</strong></div>
         <div><span>Confidence</span><strong>${Math.round(trade.confidence * 100)}%</strong></div>
       </div>
-      <p class="thesis">${escapeHtml(trade.thesis)}</p>
-      <div class="confidence" aria-label="${Math.round(trade.confidence * 100)} percent confidence"><span style="width:${trade.confidence * 100}%"></span></div>
-      <div class="chart-widget" data-tour="chart"></div>
-      <details><summary>Evidence & risks</summary>
-        <div class="evidence">${trade.evidence.map(e => `<p><strong>${escapeHtml(e.label)}</strong><span>${escapeHtml(e.value)}</span><small>${escapeHtml(e.source)} · ${new Date(e.as_of).toLocaleDateString()}</small></p>`).join("")}</div>
-        <ul>${trade.key_risks.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
-      </details>`;
+      <div class="trade-body" ${expanded ? "" : "hidden"}>
+        <p class="thesis">${escapeHtml(trade.thesis)}</p>
+        <div class="confidence" aria-label="${Math.round(trade.confidence * 100)} percent confidence"><span style="width:${trade.confidence * 100}%"></span></div>
+        <div class="debate-chart-widget" data-tour="debate-chart"></div>
+        <div class="chart-widget" data-tour="chart"></div>
+        <details><summary>Evidence & risks</summary>
+          <div class="evidence">${trade.evidence.map(e => `<p><strong>${escapeHtml(e.label)}</strong><span>${escapeHtml(e.value)}</span><small>${escapeHtml(e.source)} · ${new Date(e.as_of).toLocaleDateString()}</small></p>`).join("")}</div>
+          <ul>${trade.key_risks.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
+        </details>
+      </div>`;
     resultsEl.appendChild(card);
+    renderDebateChart(card.querySelector(".debate-chart-widget"), trade);
     renderPriceChart(card.querySelector(".chart-widget"), trade);
+    card.querySelector(".trade-expand")?.addEventListener("click", event => {
+      const body = card.querySelector(".trade-body");
+      const shouldExpand = body.hidden;
+      body.hidden = !shouldExpand;
+      event.currentTarget.setAttribute("aria-expanded", String(shouldExpand));
+      event.currentTarget.textContent = shouldExpand ? "Condense" : "View analysis";
+    });
   });
 }
 
@@ -299,6 +381,7 @@ const allTourSteps = [
   {selector:".process-card", kicker:"Follow the reasoning", title:"Live agent room", copy:"This feed shows each step in order. Bull looks for upside, Bear challenges it, Risk applies safeguards, and the Portfolio Manager makes the final call."},
   {selector:".output-card", kicker:"Read the decision", title:"PM scorecard", copy:"This is the concise outcome. Direction shows the current signal, while the score measures strength—not a guaranteed return."},
   {selector:".metrics", kicker:"Understand the numbers", title:"Three useful reference points", copy:"Last close is the latest validated price. Daily move is the most recent change. Confidence is deliberately reduced when volatility or evidence risk is high."},
+  {selector:"[data-tour='debate-chart']", kicker:"Quantify the discussion", title:"Bull versus Bear decision path", copy:"Each line scores the evidence used in that round from 0 to 100. Hover or use the arrow keys to see how momentum, drawdown and volatility shifted the balance. This is evidence strength, not a return probability."},
   {selector:"[data-tour='chart']", kicker:"Explore the evidence", title:"Interactive price history", copy:"Switch between one and three months. Hover or use the arrow keys to inspect exact daily closing prices. The source shown below matches the analysis data."},
   {selector:".trade details", kicker:"Challenge the result", title:"Evidence and risks", copy:"Open this section to see source dates and the limitations that could weaken or invalidate the signal."},
   {selector:".method", kicker:"Know the boundaries", title:"Methodology and limitations", copy:"This explains how the score is calculated and what the screen does not know. Northstar is research support, not investment advice."},
@@ -315,7 +398,13 @@ function positionTour() {
   const step = tourSteps[tourIndex];
   const target = document.querySelector(step.selector);
   if (!target) return;
-  target.scrollIntoView({behavior:"smooth", block:"center"});
+  target.scrollIntoView({behavior:"auto", block:"center"});
+  tourCard.style.inset = "auto";
+  tourCard.style.left = "50%";
+  tourCard.style.top = "50%";
+  tourCard.style.right = "auto";
+  tourCard.style.bottom = "auto";
+  tourCard.style.transform = "translate(-50%, -50%)";
   requestAnimationFrame(() => {
     const rect = target.getBoundingClientRect();
     const gap = 8;
