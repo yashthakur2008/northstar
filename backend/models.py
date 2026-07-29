@@ -31,6 +31,11 @@ class Evidence(BaseModel):
     as_of: datetime
 
 
+class PricePoint(BaseModel):
+    timestamp: datetime
+    close: float = Field(gt=0)
+
+
 class DebateMessage(BaseModel):
     sequence: int
     symbol: str
@@ -54,6 +59,7 @@ class TradeIdea(BaseModel):
     supporting_agents: list[str]
     dissenting_agents: list[str]
     evidence: list[Evidence] = Field(default_factory=list)
+    price_history: list[PricePoint] = Field(default_factory=list)
     data_quality: Literal["live", "delayed", "unavailable"] = "unavailable"
 
 

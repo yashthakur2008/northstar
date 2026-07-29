@@ -36,6 +36,8 @@ async def test_engine_is_deterministic_and_traced() -> None:
     assert report.is_mocked is False
     assert len(report.top_trades) == 1
     assert report.top_trades[0].confidence <= 0.82
+    assert len(report.top_trades[0].price_history) == 45
+    assert report.top_trades[0].price_history[-1].close == 122.0
     assert report.debate[-1].agent == "Portfolio Manager"
     assert all(item.source for item in report.top_trades[0].evidence)
 

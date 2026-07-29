@@ -13,7 +13,12 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Northstar home"><span class="brand-mark">N</span><span>Northstar</span></a>
-    <div class="system"><span class="pulse"></span> Research systems operational</div>
+    <div class="topbar-actions">
+      <div class="system"><span class="pulse"></span> Research systems operational</div>
+      <button id="help-button" class="help-button" type="button" aria-label="Open guided help">
+        <span aria-hidden="true">?</span> Help
+      </button>
+    </div>
   </header>
 
   <main class="shell">
@@ -66,6 +71,24 @@
   </main>
 
   <footer>Research tooling for educational use. Screen outputs are not investment advice or an offer to transact.</footer>
+
+  <div id="tour" class="tour" hidden>
+    <div class="tour-shade" aria-hidden="true"></div>
+    <div id="tour-focus" class="tour-focus" aria-hidden="true"></div>
+    <section id="tour-card" class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-copy">
+      <div class="tour-card-head">
+        <span id="tour-progress" class="tour-progress">1 of 6</span>
+        <button id="tour-close" class="tour-close" type="button" aria-label="Close guided help">×</button>
+      </div>
+      <p id="tour-kicker" class="tour-kicker">Start here</p>
+      <h2 id="tour-title">Choose what to research</h2>
+      <p id="tour-copy">Enter up to five ticker symbols and choose how many rounds the Bull and Bear agents should debate.</p>
+      <div class="tour-actions">
+        <button id="tour-back" class="tour-back" type="button">Back</button>
+        <button id="tour-next" class="tour-next" type="button">Next <span aria-hidden="true">→</span></button>
+      </div>
+    </section>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>

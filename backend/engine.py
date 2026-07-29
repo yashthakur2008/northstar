@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 
-from models import AnalysisReport, AnalyzeRequest, DebateMessage, Evidence, TradeIdea
+from models import AnalysisReport, AnalyzeRequest, DebateMessage, Evidence, PricePoint, TradeIdea
 from providers import MarketDataProvider, MarketSnapshot, ResilientMarketData
 
 
@@ -81,13 +81,21 @@ def _judge(snapshot: MarketSnapshot, messages: list[DebateMessage]) -> TradeIdea
         Evidence(label="1-month return", value=f"{snapshot.return_1m:+.1f}%", source=snapshot.source, as_of=snapshot.as_of),
         Evidence(label="Realized volatility", value=f"{vol:.1f}%", source=f"Derived from {snapshot.source}", as_of=snapshot.as_of),
     ]
+    price_history = [
+        PricePoint(
+            timestamp=datetime.fromtimestamp(timestamp, tz=timezone.utc),
+            close=round(price, 4),
+        )
+        for timestamp, price in zip(snapshot.timestamps, snapshot.prices)
+    ]
     supporters = ["Technical"] + (["Bull"] if score > 0 else ["Bear"] if score < 0 else [])
     dissenters = ["Bear"] if score > 0 else ["Bull"] if score < 0 else ["Bull", "Bear"]
     return TradeIdea(
         symbol=snapshot.symbol, direction=direction, actionability=actionability, thesis=thesis,
         confidence=confidence, score=score, last_price=round(snapshot.last, 2),
         change_pct=round(snapshot.change_pct, 2), key_risks=risks,
-        supporting_agents=supporters, dissenting_agents=dissenters, evidence=evidence, data_quality="live",
+        supporting_agents=supporters, dissenting_agents=dissenters, evidence=evidence,
+        price_history=price_history, data_quality="live",
     )
 
 
