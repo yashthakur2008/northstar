@@ -195,3 +195,32 @@ class ResilientMarketData:
         reason = "; ".join(failures) or "no provider returned data"
         logger.error("all_market_providers_failed symbol=%s failures=%s", symbol, reason)
         raise MarketDataError("all providers", symbol, reason)
+
+
+def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float = 7.0) -> list[dict]:
+    """Fetch a small, source-labeled headline set without making news critical-path data."""
+    url = (
+        "https://query1.finance.yahoo.com/v1/finance/search?"
+        f"q={quote(query)}&quotesCount=0&newsCount={max(1, min(limit, 10))}"
+    )
+    request = Request(url, headers={"User-Agent": "NorthstarResearch/1.0"})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            payload = json.load(response)
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        logger.warning("news_provider_failed provider=Yahoo Finance reason=%s", type(exc).__name__)
+        return []
+    items: list[dict] = []
+    for item in payload.get("news", []):
+        title = item.get("title")
+        link = item.get("link")
+        published = item.get("providerPublishTime")
+        if not title or not link or not published:
+            continue
+        items.append({
+            "title": str(title),
+            "publisher": str(item.get("publisher") or "Yahoo Finance"),
+            "published_at": datetime.fromtimestamp(int(published), tz=timezone.utc),
+            "url": str(link),
+        })
+    return items[:limit]

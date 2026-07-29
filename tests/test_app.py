@@ -1,5 +1,8 @@
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 
+import main
 from engine import AnalysisEngine
 from main import app
 from models import AnalyzeRequest
@@ -29,6 +32,28 @@ def test_request_validation() -> None:
     assert client.post("/api/analyze", json={"tickers": ["bad ticker"]}).status_code == 422
     assert client.post("/api/analyze", json={"tickers": ["A", "B", "C", "D", "E", "F"]}).status_code == 422
     assert client.post("/api/analyze", json={"tickers": ["A"], "debate_rounds": 31}).status_code == 422
+
+
+def test_market_pulse_is_typed_and_resilient(monkeypatch) -> None:
+    previous_provider = main.engine.provider
+    main.engine.provider = StubProvider()
+    monkeypatch.setattr(main, "fetch_yahoo_news", lambda: [{
+        "title": "Markets test headline",
+        "publisher": "Test publisher",
+        "published_at": datetime.now(timezone.utc),
+        "url": "https://example.com/story",
+    }])
+    try:
+        response = TestClient(app).get("/api/market-pulse?symbols=TEST,TEST")
+    finally:
+        main.engine.provider = previous_provider
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_status"] == "live"
+    assert len(body["stocks"]) == 1
+    assert body["stocks"][0]["symbol"] == "TEST"
+    assert len(body["stocks"][0]["history"]) == 22
+    assert body["news"][0]["publisher"] == "Test publisher"
 
 
 async def test_engine_is_deterministic_and_traced() -> None:

@@ -80,3 +80,26 @@ class AnalysisReport(BaseModel):
     methodology: str
     source_status: Literal["live", "partial", "unavailable"]
     is_mocked: bool = False
+
+
+class StockPulse(BaseModel):
+    symbol: str
+    last_price: float = Field(gt=0)
+    change_pct: float
+    as_of: datetime
+    source: str
+    history: list[PricePoint]
+
+
+class NewsItem(BaseModel):
+    title: str
+    publisher: str
+    published_at: datetime
+    url: str
+
+
+class MarketPulse(BaseModel):
+    stocks: list[StockPulse]
+    news: list[NewsItem]
+    generated_at: datetime
+    source_status: Literal["live", "partial", "unavailable"]

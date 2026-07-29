@@ -13,6 +13,14 @@ const analysisProgress = document.querySelector("#analysis-progress");
 const progressStage = document.querySelector("#progress-stage");
 const progressPercent = document.querySelector("#progress-percent");
 const progressFill = document.querySelector("#progress-fill");
+const pulseViewport = document.querySelector("#pulse-viewport");
+const pulseTrack = document.querySelector("#pulse-track");
+const pulseStatus = document.querySelector("#pulse-status");
+const newsGrid = document.querySelector("#news-grid");
+const pulsePause = document.querySelector("#pulse-pause");
+let pulseIndex = 0;
+let pulseTimer = null;
+let pulsePaused = false;
 
 const agentInitial = {"Market Data":"M","Technical":"T","Bull":"B+","Bear":"B−","Risk":"R","Portfolio Manager":"PM"};
 const money = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:2});
@@ -44,6 +52,106 @@ function parseTickers(value) {
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
 }
+
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["https:", "http:"].includes(url.protocol) ? url.href : "#";
+  } catch (_) {
+    return "#";
+  }
+}
+
+function miniChart(points, positive) {
+  if (!points || points.length < 2) return "";
+  const width = 260;
+  const height = 74;
+  const values = points.map(point => point.close);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const x = index => (index / (points.length - 1)) * width;
+  const y = value => 4 + ((max - value) / Math.max(max - min, .01)) * (height - 8);
+  const path = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.close).toFixed(1)}`).join(" ");
+  return `<svg class="pulse-chart ${positive ? "positive-chart" : "negative-chart"}" viewBox="0 0 ${width} ${height}" role="img" aria-label="One month price trend"><path d="${path}"/></svg>`;
+}
+
+function setPulseIndex(index, behavior = "smooth") {
+  const cards = [...pulseTrack.querySelectorAll(".pulse-card")];
+  if (!cards.length) return;
+  pulseIndex = (index + cards.length) % cards.length;
+  cards.forEach((card, cardIndex) => card.classList.toggle("is-active", cardIndex === pulseIndex));
+  const card = cards[pulseIndex];
+  pulseViewport.scrollTo({
+    left: card.offsetLeft - (pulseViewport.clientWidth - card.offsetWidth) / 2,
+    behavior,
+  });
+}
+
+function startPulseTimer() {
+  clearInterval(pulseTimer);
+  if (pulsePaused || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  pulseTimer = setInterval(() => setPulseIndex(pulseIndex + 1), 3200);
+}
+
+function renderMarketPulse(payload) {
+  const stocks = payload.stocks || [];
+  if (stocks.length) {
+    pulseTrack.innerHTML = stocks.map(stock => {
+      const positive = stock.change_pct >= 0;
+      return `<article class="pulse-card">
+        <div class="pulse-card-head"><strong>${escapeHtml(stock.symbol)}</strong><span class="${positive ? "positive" : "negative"}">${positive ? "+" : ""}${stock.change_pct.toFixed(2)}%</span></div>
+        <div class="pulse-price">${money.format(stock.last_price)}</div>
+        ${miniChart(stock.history, positive)}
+        <div class="pulse-card-foot"><span>1 month</span><span>${escapeHtml(stock.source)}</span></div>
+      </article>`;
+    }).join("");
+    requestAnimationFrame(() => setPulseIndex(0, "auto"));
+    pulseStatus.textContent = `${stocks.length} current snapshots · Updated ${new Date(payload.generated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})} · Auto-advances every few seconds`;
+    startPulseTimer();
+  } else {
+    pulseTrack.innerHTML = `<div class="pulse-loading">Market snapshots are temporarily unavailable.</div>`;
+    pulseStatus.textContent = "The research desk remains available; this non-critical market rail will retry on the next load.";
+  }
+
+  const news = payload.news || [];
+  newsGrid.innerHTML = news.length ? news.map((item, index) => `
+    <a class="news-card${index === 0 ? " lead-news" : ""}" href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">
+      <span class="news-meta">${escapeHtml(item.publisher)} · ${new Date(item.published_at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span>
+      <strong>${escapeHtml(item.title)}</strong>
+      <span class="news-link">Read coverage <span aria-hidden="true">↗</span></span>
+    </a>`).join("") : `<div class="news-loading">Headlines are temporarily unavailable. Stock updates remain live.</div>`;
+}
+
+async function loadMarketPulse(symbols = []) {
+  try {
+    const query = symbols.length ? `?symbols=${encodeURIComponent(symbols.join(","))}` : "";
+    const response = await fetch(`/api/market-pulse${query}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    renderMarketPulse(await response.json());
+  } catch (_) {
+    renderMarketPulse({stocks:[], news:[]});
+  }
+}
+
+document.querySelector("#pulse-prev").addEventListener("click", () => {
+  setPulseIndex(pulseIndex - 1);
+  startPulseTimer();
+});
+document.querySelector("#pulse-next").addEventListener("click", () => {
+  setPulseIndex(pulseIndex + 1);
+  startPulseTimer();
+});
+pulsePause.addEventListener("click", () => {
+  pulsePaused = !pulsePaused;
+  pulsePause.setAttribute("aria-pressed", String(pulsePaused));
+  pulsePause.textContent = pulsePaused ? "Resume" : "Pause";
+  startPulseTimer();
+});
+pulseViewport.addEventListener("pointerenter", () => clearInterval(pulseTimer));
+pulseViewport.addEventListener("pointerleave", startPulseTimer);
+pulseViewport.addEventListener("focusin", () => clearInterval(pulseTimer));
+pulseViewport.addEventListener("focusout", startPulseTimer);
+loadMarketPulse();
 
 function addDebate(message) {
   const item = document.createElement("article");
@@ -336,6 +444,7 @@ form.addEventListener("submit", async event => {
     return;
   }
   delete statusEl.dataset.tone;
+  loadMarketPulse(tickers);
   runButton.disabled = true;
   workspace.hidden = false;
   debateEl.innerHTML = "";
@@ -378,6 +487,8 @@ let returnFocus = null;
 
 const allTourSteps = [
   {selector:"#analyze-form", kicker:"Start here", title:"Choose what to research", copy:"Enter up to five ticker symbols and choose 1–30 rounds. Each round tests a different time window and risk lens before the stocks are ranked."},
+  {selector:".pulse-viewport", kicker:"Scan the market", title:"Live market pulse", copy:"These source-labeled one-month charts advance automatically and enlarge the active security. Pause the rail or use the arrow controls whenever you want to inspect one stock."},
+  {selector:".news-grid", kicker:"Track new information", title:"Latest market coverage", copy:"This separate feed shows timestamped headlines and their publishers. Each story opens at its Yahoo Finance destination so you can evaluate the original coverage."},
   {selector:".process-card", kicker:"Follow the reasoning", title:"Live agent room", copy:"This feed shows each step in order. Bull looks for upside, Bear challenges it, Risk applies safeguards, and the Portfolio Manager makes the final call."},
   {selector:".output-card", kicker:"Read the decision", title:"PM scorecard", copy:"This is the concise outcome. Direction shows the current signal, while the score measures strength—not a guaranteed return."},
   {selector:".metrics", kicker:"Understand the numbers", title:"Three useful reference points", copy:"Last close is the latest validated price. Daily move is the most recent change. Confidence is deliberately reduced when volatility or evidence risk is high."},

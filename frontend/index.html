@@ -57,6 +57,34 @@
       </form>
     </section>
 
+    <section id="market-pulse" class="market-pulse" aria-labelledby="pulse-title">
+      <div class="pulse-heading">
+        <div>
+          <p class="kicker">Live market pulse</p>
+          <h2 id="pulse-title">What is moving now</h2>
+        </div>
+        <div class="pulse-controls" aria-label="Market pulse controls">
+          <button id="pulse-prev" type="button" aria-label="Previous stock">←</button>
+          <button id="pulse-pause" type="button" aria-pressed="false">Pause</button>
+          <button id="pulse-next" type="button" aria-label="Next stock">→</button>
+        </div>
+      </div>
+      <div id="pulse-viewport" class="pulse-viewport" tabindex="0" aria-label="Recent stock updates">
+        <div id="pulse-track" class="pulse-track">
+          <div class="pulse-loading">Loading current market snapshots…</div>
+        </div>
+      </div>
+      <p id="pulse-status" class="pulse-status" aria-live="polite">Live daily market history from the same resilient data layer used by the research desk.</p>
+
+      <div class="news-heading">
+        <div><p class="kicker">Latest coverage</p><h2>Market news</h2></div>
+        <span>Headlines open at their original Yahoo Finance destination</span>
+      </div>
+      <div id="news-grid" class="news-grid">
+        <div class="news-loading">Gathering the latest headlines…</div>
+      </div>
+    </section>
+
     <section id="workspace" class="workspace" hidden>
       <div class="workspace-head">
         <div><p class="kicker">Research run</p><h2>Investment committee feed</h2></div>

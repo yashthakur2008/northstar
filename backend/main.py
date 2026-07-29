@@ -6,15 +6,18 @@ import asyncio
 import json
 import logging
 import os
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from engine import AnalysisEngine
-from models import AnalysisReport, AnalyzeRequest
+from models import AnalysisReport, AnalyzeRequest, MarketPulse, NewsItem, PricePoint, StockPulse
+from providers import fetch_yahoo_news
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
@@ -36,6 +39,38 @@ if allowed_origins:
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "version": app.version, "market_data": "Yahoo Finance with Nasdaq fallback"}
+
+
+@app.get("/api/market-pulse", response_model=MarketPulse)
+async def market_pulse(
+    symbols: str = Query(default="SPY,QQQ,NVDA,AAPL,MSFT,TSLA", max_length=80),
+) -> MarketPulse:
+    requested = list(dict.fromkeys(part.strip().upper() for part in symbols.split(",") if part.strip()))
+    valid = [symbol for symbol in requested if re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol)][:6]
+    if not valid:
+        valid = ["SPY", "QQQ", "NVDA", "AAPL", "MSFT", "TSLA"]
+    snapshots, news_rows = await asyncio.gather(
+        asyncio.gather(*(engine.provider.fetch(symbol) for symbol in valid), return_exceptions=True),
+        asyncio.to_thread(fetch_yahoo_news),
+    )
+    stocks: list[StockPulse] = []
+    for snapshot in snapshots:
+        if isinstance(snapshot, Exception):
+            continue
+        stocks.append(StockPulse(
+            symbol=snapshot.symbol,
+            last_price=round(snapshot.last, 2),
+            change_pct=round(snapshot.change_pct, 2),
+            as_of=snapshot.as_of,
+            source=snapshot.source,
+            history=[
+                PricePoint(timestamp=datetime.fromtimestamp(timestamp, tz=timezone.utc), close=round(price, 4))
+                for timestamp, price in zip(snapshot.timestamps[-22:], snapshot.prices[-22:])
+            ],
+        ))
+    news = [NewsItem(**row) for row in news_rows]
+    status = "live" if len(stocks) == len(valid) and news else "partial" if stocks or news else "unavailable"
+    return MarketPulse(stocks=stocks, news=news, generated_at=datetime.now(timezone.utc), source_status=status)
 
 
 @app.post("/api/analyze", response_model=AnalysisReport)

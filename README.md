@@ -16,6 +16,8 @@ Manager verdict as a streamed event sequence.
 - Three-way Bull → Bear rebuttal → Risk adjudication in every round
 - Live stage progress and explicit cross-stock conviction ranking
 - Interactive, source-attributed 1M/3M price charts with pointer and keyboard inspection
+- Self-advancing market pulse with current one-month mini charts and motion controls
+- Separate, timestamped market-news section with outbound source links
 - Context-aware guided Help tour for every major research surface
 - Persistent light/dark theme control with first-visit system preference
 - Typed contracts, same-origin security defaults, health check, and API docs
@@ -56,6 +58,7 @@ Open <http://localhost:8000>; API docs are at <http://localhost:8000/api/docs>.
 - `GET /api/health` — readiness and version
 - `POST /api/analyze` — complete JSON report
 - `POST /api/analyze/stream` — SSE `status`, `debate`, and `report` events
+- `GET /api/market-pulse` — recent stock snapshots, mini-chart history, and current headlines
 
 ```json
 {"tickers": ["NVDA", "MSFT"], "debate_rounds": 2}
