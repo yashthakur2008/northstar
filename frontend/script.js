@@ -17,6 +17,7 @@ const pulseViewport = document.querySelector("#pulse-viewport");
 const pulseTrack = document.querySelector("#pulse-track");
 const pulseStatus = document.querySelector("#pulse-status");
 const newsGrid = document.querySelector("#news-grid");
+const newsMore = document.querySelector("#news-more");
 const pulseFormat = document.querySelector("#pulse-format");
 const stockDetail = document.querySelector("#stock-detail");
 const detailContent = document.querySelector("#detail-content");
@@ -25,6 +26,9 @@ const analyzerOutput = document.querySelector("#analyzer-output");
 let pulseIndex = 0;
 let pulseStocks = [];
 let pulseNews = [];
+let visibleNewsCount = 4;
+let newsMoreSelections = 0;
+let lastAnalyzerData = null;
 let pulseFrame = null;
 let pulseLastFrame = 0;
 let pulseResumeAt = 0;
@@ -218,23 +222,31 @@ function renderMarketPulse(payload) {
 
   const news = payload.news || [];
   pulseNews = news;
-  newsGrid.innerHTML = news.length ? news.map((item, index) => `
-    <a class="news-card${index === 0 ? " lead-news" : ""}${item.is_trending ? " is-trending" : ""}" href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">
-      <div class="news-visual${item.image_url ? "" : " is-fallback"}">
-        ${item.image_url ? `<img src="${escapeHtml(safeExternalUrl(item.image_url))}" alt="" loading="lazy">` : ""}
-        <span class="news-visual-label">${escapeHtml(item.publisher)}</span>
-        <svg viewBox="0 0 240 90" aria-hidden="true"><path d="M0 72 L30 61 L58 66 L87 35 L115 49 L145 21 L174 39 L206 14 L240 27"/></svg>
-      </div>
-      <div class="news-body">
-        <div class="news-byline">${item.is_trending ? `<span class="trending-badge">Trending</span>` : ""}<span class="news-meta">${escapeHtml(item.publisher)} · ${new Date(item.published_at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span></div>
-        <strong>${escapeHtml(item.title)}</strong>
-        <span class="news-link">Read coverage <span aria-hidden="true">↗</span></span>
-      </div>
-    </a>`).join("") : `<div class="news-loading">Headlines are temporarily unavailable. Stock updates remain live.</div>`;
+  renderNewsCards();
+}
+
+function newsCardMarkup(item, index) {
+  const visual = item.image_url ? `<div class="news-visual"><img src="${escapeHtml(safeExternalUrl(item.image_url))}" alt="" loading="lazy"><span class="news-visual-label">${escapeHtml(item.publisher)}</span></div>` : "";
+  return `<a class="news-card${index === 0 ? " lead-news" : ""}${visual ? "" : " no-image"}" href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">
+    ${visual}
+    <div class="news-body">
+      <div class="news-byline"><span class="news-meta">${escapeHtml(item.publisher)} · ${new Date(item.published_at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span></div>
+      <strong>${escapeHtml(item.title)}</strong>
+      <span class="news-link">Read original article <span aria-hidden="true">↗</span></span>
+    </div>
+  </a>`;
+}
+
+function renderNewsCards() {
+  const visible = pulseNews.slice(0, visibleNewsCount);
+  newsGrid.innerHTML = visible.length ? visible.map(newsCardMarkup).join("") : `<div class="news-loading">Headlines are temporarily unavailable. Stock updates remain live.</div>`;
   newsGrid.querySelectorAll(".news-visual img").forEach(image => image.addEventListener("error", () => {
-    image.hidden = true;
-    image.parentElement.classList.add("is-fallback");
+    const card = image.closest(".news-card");
+    image.parentElement.remove();
+    card.classList.add("no-image");
   }, {once:true}));
+  newsMore.hidden = !pulseNews.length;
+  newsMore.textContent = newsMoreSelections >= 2 ? "View all market news →" : "Show more articles";
 }
 
 async function loadMarketPulse(symbols = []) {
@@ -293,6 +305,16 @@ stockDetail.addEventListener("click", event => {
   if (event.target === stockDetail) stockDetail.close();
 });
 loadMarketPulse();
+
+newsMore.addEventListener("click", () => {
+  newsMoreSelections += 1;
+  if (newsMoreSelections >= 3) {
+    window.location.href = "/news.html";
+    return;
+  }
+  visibleNewsCount = Math.min(pulseNews.length, visibleNewsCount + 2);
+  renderNewsCards();
+});
 
 function compactNumber(value) {
   return new Intl.NumberFormat("en-US", {notation:"compact", maximumFractionDigits:1}).format(value);
@@ -380,6 +402,7 @@ function bindAnalyzerChart(container, data) {
 }
 
 function renderStockAnalysis(data) {
+  lastAnalyzerData = data;
   const chartType = document.querySelector("#analyzer-chart-type").value;
   const positive = data.period_return >= 0;
   analyzerOutput.innerHTML = `
@@ -394,9 +417,18 @@ function renderStockAnalysis(data) {
       <div><span>Realized volatility</span><strong>${data.volatility.toFixed(1)}%</strong></div>
       <div><span>Average volume</span><strong>${compactNumber(data.average_volume)}</strong></div>
     </div>
+    <div class="analyzer-view-controls" aria-label="Chart type">
+      <span>Chart view</span>
+      <button type="button" data-chart="line" aria-pressed="${chartType === "line"}">Line</button>
+      <button type="button" data-chart="candle" aria-pressed="${chartType === "candle"}">Candlestick</button>
+    </div>
     ${analyzerChartMarkup(data, chartType)}
     <p class="analyzer-source">${escapeHtml(data.source)} · ${data.interval === "1wk" ? "Weekly" : "Daily"} OHLCV history · ${new Date(data.history[0].timestamp).toLocaleDateString()}–${new Date(data.history.at(-1).timestamp).toLocaleDateString()}</p>`;
   bindAnalyzerChart(analyzerOutput, data);
+  analyzerOutput.querySelectorAll("[data-chart]").forEach(button => button.addEventListener("click", () => {
+    document.querySelector("#analyzer-chart-type").value = button.dataset.chart;
+    renderStockAnalysis(data);
+  }));
 }
 
 analyzerForm.addEventListener("submit", async event => {
@@ -424,7 +456,7 @@ analyzerForm.addEventListener("submit", async event => {
   }
 });
 document.querySelector("#analyzer-chart-type").addEventListener("change", () => {
-  if (analyzerOutput.querySelector(".analyzer-svg")) analyzerForm.requestSubmit();
+  if (lastAnalyzerData) renderStockAnalysis(lastAnalyzerData);
 });
 
 function addDebate(message) {

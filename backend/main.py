@@ -65,7 +65,7 @@ async def market_pulse(
         valid = ["SPY", "QQQ", "DIA", "IWM", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "BRK-B"]
     snapshots, news_rows = await asyncio.gather(
         asyncio.gather(*(engine.provider.fetch(symbol) for symbol in valid), return_exceptions=True),
-        asyncio.to_thread(fetch_yahoo_news),
+        asyncio.to_thread(fetch_yahoo_news, "stock market", 10),
     )
     stocks: list[StockPulse] = []
     for snapshot in snapshots:

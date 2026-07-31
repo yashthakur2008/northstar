@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import math
+import re
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -257,6 +258,10 @@ def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float
                             enclosure.get("type") or ""
                         ).startswith("image/"):
                             image_url = enclosure.get("url")
+                        if not image_url:
+                            description = node.findtext("description") or ""
+                            match = re.search(r"""<img[^>]+src=["']([^"']+)""", description, re.IGNORECASE)
+                            image_url = match.group(1) if match else None
                         items.append({
                             "title": title,
                             "publisher": source,
