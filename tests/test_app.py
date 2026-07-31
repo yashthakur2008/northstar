@@ -35,8 +35,8 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260731c" in page.text
-    assert "script.js?v=20260731c" in page.text
+    assert "style.css?v=20260731d" in page.text
+    assert "script.js?v=20260731d" in page.text
 
 
 def test_all_news_page_is_available() -> None:

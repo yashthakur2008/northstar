@@ -790,6 +790,7 @@ const tourNext = document.querySelector("#tour-next");
 let tourSteps = [];
 let tourIndex = 0;
 let returnFocus = null;
+let tourPositionFrame = null;
 
 const allTourSteps = [
   {selector:"#analyze-form", kicker:"Start here", title:"Choose what to research", copy:"Enter up to five ticker symbols and choose 1–30 rounds. Each round tests a different time window and risk lens before the stocks are ranked."},
@@ -812,25 +813,44 @@ function availableTourSteps() {
   });
 }
 
+function updateTourGeometry() {
+  if (tour.hidden || !tourSteps.length) return;
+  const step = tourSteps[tourIndex];
+  const target = document.querySelector(step.selector);
+  if (!target) return;
+  cancelAnimationFrame(tourPositionFrame);
+  tourPositionFrame = requestAnimationFrame(() => {
+    const rect = target.getBoundingClientRect();
+    const gap = 8;
+    const left = Math.max(gap, rect.left - gap);
+    const top = Math.max(gap, rect.top - gap);
+    const right = Math.min(window.innerWidth - gap, rect.right + gap);
+    const bottom = Math.min(window.innerHeight - gap, rect.bottom + gap);
+    tourFocus.style.left = `${left}px`;
+    tourFocus.style.top = `${top}px`;
+    tourFocus.style.width = `${Math.max(0, right - left)}px`;
+    tourFocus.style.height = `${Math.max(0, bottom - top)}px`;
+  });
+}
+
 function positionTour() {
   const step = tourSteps[tourIndex];
   const target = document.querySelector(step.selector);
   if (!target) return;
-  target.scrollIntoView({behavior:"auto", block:"center"});
+  const rect = target.getBoundingClientRect();
+  const headerOffset = 78;
+  const availableHeight = window.innerHeight - headerOffset;
+  const targetTop = rect.height >= availableHeight
+    ? window.scrollY + rect.top - headerOffset
+    : window.scrollY + rect.top - headerOffset - (availableHeight - rect.height) / 2;
+  window.scrollTo({top:Math.max(0, targetTop), behavior:"auto"});
   tourCard.style.inset = "auto";
   tourCard.style.left = "50%";
   tourCard.style.top = "50%";
   tourCard.style.right = "auto";
   tourCard.style.bottom = "auto";
   tourCard.style.transform = "translate(-50%, -50%)";
-  requestAnimationFrame(() => {
-    const rect = target.getBoundingClientRect();
-    const gap = 8;
-    tourFocus.style.left = `${Math.max(gap, rect.left - gap)}px`;
-    tourFocus.style.top = `${Math.max(gap, rect.top - gap)}px`;
-    tourFocus.style.width = `${Math.min(window.innerWidth - gap * 2, rect.width + gap * 2)}px`;
-    tourFocus.style.height = `${Math.min(window.innerHeight - gap * 2, rect.height + gap * 2)}px`;
-  });
+  requestAnimationFrame(() => requestAnimationFrame(updateTourGeometry));
 }
 
 function showTourStep() {
@@ -858,6 +878,7 @@ function openTour() {
 function closeTour() {
   tour.hidden = true;
   document.body.classList.remove("tour-open");
+  cancelAnimationFrame(tourPositionFrame);
   returnFocus?.focus();
 }
 
@@ -895,5 +916,8 @@ document.addEventListener("keydown", event => {
   }
 });
 window.addEventListener("resize", () => {
-  if (!tour.hidden) positionTour();
+  if (!tour.hidden) updateTourGeometry();
 });
+window.addEventListener("scroll", () => {
+  if (!tour.hidden) updateTourGeometry();
+}, {passive:true});
