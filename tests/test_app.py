@@ -35,8 +35,8 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260731e" in page.text
-    assert "script.js?v=20260731e" in page.text
+    assert "style.css?v=20260731f" in page.text
+    assert "script.js?v=20260731f" in page.text
     assert "How to use Northstar" in page.text
     assert "Research systems operational" not in page.text
 
@@ -46,6 +46,14 @@ def test_all_news_page_is_available() -> None:
     assert page.status_code == 200
     assert "Market news" in page.text
     assert "news.js?v=20260731e" in page.text
+
+
+def test_beginner_guide_is_publicly_available() -> None:
+    page = TestClient(app).get("/beginners.html")
+    assert page.status_code == 200
+    assert "Your first stock analysis" in page.text
+    assert "What is a stock ticker?" in page.text
+    assert "Signal score" in page.text
 
 
 def test_request_validation() -> None:

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A beginner-friendly guide to using Northstar for stock research.">
+  <title>Beginner Guide · Northstar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20260731f">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northstar home"><span class="brand-mark">N</span><span>Northstar</span></a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="/">Home</a>
+      <a href="/#workspace">Research</a>
+      <a href="/news.html">News</a>
+      <a href="/beginners.html" aria-current="page">Learn</a>
+    </nav>
+  </header>
+
+  <main class="learn-page">
+    <section class="learn-hero">
+      <p class="kicker">Northstar fundamentals</p>
+      <h1>Your first stock analysis, explained from the beginning.</h1>
+      <p>No finance background is required. This guide explains every important label, marker, chart, and decision before you run the research desk.</p>
+      <div class="learn-actions"><a class="learn-primary" href="#first-run">Start the walkthrough ↓</a><a href="/">Open Northstar</a></div>
+    </section>
+
+    <nav class="learn-contents" aria-label="Guide contents">
+      <span>On this page</span>
+      <a href="#language">Basic language</a>
+      <a href="#first-run">Your first run</a>
+      <a href="#agents">The agents</a>
+      <a href="#scorecard">The scorecard</a>
+      <a href="#charts">Charts and markers</a>
+      <a href="#limits">Limits</a>
+    </nav>
+
+    <section id="language" class="learn-section">
+      <div class="learn-section-title"><span>01</span><div><p class="kicker">Basic language</p><h2>What is a stock ticker?</h2></div></div>
+      <div class="learn-copy">
+        <p>A <strong>ticker</strong> is a short code used to identify a publicly traded security. You type the code—not the full company name—into Northstar.</p>
+        <div class="term-grid">
+          <article><strong>NVDA</strong><span>Nvidia</span><p>A company stock.</p></article>
+          <article><strong>AAPL</strong><span>Apple</span><p>A company stock.</p></article>
+          <article><strong>MSFT</strong><span>Microsoft</span><p>A company stock.</p></article>
+          <article><strong>SPY</strong><span>S&amp;P 500 ETF</span><p>A fund holding many companies.</p></article>
+          <article><strong>QQQ</strong><span>Nasdaq-100 ETF</span><p>A technology-heavy fund.</p></article>
+          <article><strong>BRK-B</strong><span>Berkshire Hathaway</span><p>A ticker containing a class marker.</p></article>
+        </div>
+        <aside class="learn-note"><strong>Tip</strong><p>Enter up to five symbols separated by commas, such as <code>NVDA, AAPL, MSFT</code>. Northstar removes duplicates and validates the format.</p></aside>
+      </div>
+    </section>
+
+    <section id="first-run" class="learn-section">
+      <div class="learn-section-title"><span>02</span><div><p class="kicker">Hands-on walkthrough</p><h2>Run your first research desk</h2></div></div>
+      <ol class="walkthrough-list">
+        <li><span>1</span><div><strong>Choose one simple ticker</strong><p>Start with a company you recognize. Enter <code>AAPL</code> in the Security universe field.</p></div></li>
+        <li><span>2</span><div><strong>Choose the number of rounds</strong><p>Use four rounds for a first run. More rounds test more historical windows; they do not make the result automatically more accurate.</p></div></li>
+        <li><span>3</span><div><strong>Select “Run desk”</strong><p>The progress bar shows the current phase while live prices are validated and the agents examine the evidence.</p></div></li>
+        <li><span>4</span><div><strong>Read the conversation in order</strong><p>Market Data establishes the facts. Bull argues the positive case. Bear challenges it. Risk states the conditions that could invalidate either side.</p></div></li>
+        <li><span>5</span><div><strong>Read the PM scorecard</strong><p>Begin with direction, signal score, and confidence. Then open the analysis to inspect the reasoning, charts, evidence, and risks.</p></div></li>
+        <li><span>6</span><div><strong>Compare—do not blindly follow</strong><p>A result is a research screen, not an instruction to buy or sell. Compare it with company fundamentals, valuation, news, and your own risk limits.</p></div></li>
+      </ol>
+    </section>
+
+    <section id="agents" class="learn-section">
+      <div class="learn-section-title"><span>03</span><div><p class="kicker">The committee</p><h2>Who is speaking in the live room?</h2></div></div>
+      <div class="agent-guide">
+        <article data-agent="data"><span>M</span><div><strong>Market Data</strong><p>Confirms prices, dates, and the amount of usable history. If validation fails, Northstar withholds the result.</p></div></article>
+        <article data-agent="technical"><span>T</span><div><strong>Technical</strong><p>Measures momentum and volatility. It describes what price has done—not why the company moved.</p></div></article>
+        <article data-agent="bull"><span>B+</span><div><strong>Bull</strong><p>Builds the positive case and identifies evidence that could support continued strength or recovery.</p></div></article>
+        <article data-agent="bear"><span>B−</span><div><strong>Bear</strong><p>Challenges the Bull case with drawdowns, weak breadth, volatility, and clear failure conditions.</p></div></article>
+        <article data-agent="risk"><span>R</span><div><strong>Risk</strong><p>Applies safeguards and reduces conviction when evidence is incomplete, volatile, or contradictory.</p></div></article>
+        <article data-agent="pm"><span>PM</span><div><strong>Portfolio Manager</strong><p>Combines the debate into the final ranked screen. This is the verdict shown in the scorecard.</p></div></article>
+      </div>
+    </section>
+
+    <section id="scorecard" class="learn-section">
+      <div class="learn-section-title"><span>04</span><div><p class="kicker">Reading the verdict</p><h2>Understand the PM scorecard</h2></div></div>
+      <div class="score-guide">
+        <article><span class="sample-marker">#1</span><strong>Conviction rank</strong><p>Ranks the submitted tickers against one another. First place is the strongest risk-adjusted setup in that specific run.</p></article>
+        <article><span class="sample-marker">LONG / SHORT / WATCH</span><strong>Direction</strong><p>Long indicates positive evidence, short indicates negative evidence, and watch means the evidence is inconclusive.</p></article>
+        <article><span class="sample-score">+42</span><strong>Signal score</strong><p>Ranges from −100 to +100. Negative is bearish; positive is bullish. It measures evidence strength after a risk haircut—not expected return.</p></article>
+        <article><span class="sample-score">61%</span><strong>Confidence</strong><p>Shows how much weight the screen assigns to its conclusion. Volatility, disagreement, and missing evidence reduce it.</p></article>
+        <article><span class="sample-score">$200.75</span><strong>Last close</strong><p>The latest validated closing price. It may differ from a live intraday quote.</p></article>
+        <article><span class="sample-score">+2.9%</span><strong>Daily move</strong><p>The change between the latest two validated daily closes.</p></article>
+      </div>
+    </section>
+
+    <section id="charts" class="learn-section">
+      <div class="learn-section-title"><span>05</span><div><p class="kicker">Visual evidence</p><h2>Charts, colors, and markers</h2></div></div>
+      <div class="chart-guide">
+        <div class="chart-key">
+          <p><i class="key-line bull-key"></i><strong>Green/Bull line</strong><span>Evidence supporting the positive case.</span></p>
+          <p><i class="key-line bear-key"></i><strong>Red/Bear line</strong><span>Evidence supporting the negative case.</span></p>
+          <p><i class="key-line neutral-key"></i><strong>50 midpoint</strong><span>Neither side has a clear advantage.</span></p>
+          <p><i class="key-candle up-key"></i><strong>Up candle</strong><span>The close finished above the open.</span></p>
+          <p><i class="key-candle down-key"></i><strong>Down candle</strong><span>The close finished below the open.</span></p>
+        </div>
+        <div class="learn-copy">
+          <h3>Line versus candlestick</h3>
+          <p>A <strong>line chart</strong> connects closing prices and is easiest for beginners. A <strong>candlestick chart</strong> shows the open, high, low, and close for every period.</p>
+          <h3>Hover markers</h3>
+          <p>Move the pointer across a chart—or use the arrow keys when it is focused—to see the exact date, closing price, OHLC values, and volume.</p>
+          <h3>Price is not the score</h3>
+          <p>The price chart shows market history. The Bull–Bear chart shows how the agents evaluated that history. The two axes measure different things.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="limits" class="learn-section">
+      <div class="learn-section-title"><span>06</span><div><p class="kicker">Use responsibly</p><h2>What Northstar does not know</h2></div></div>
+      <div class="limits-grid">
+        <p>It does not guarantee future performance.</p>
+        <p>It does not know your finances, time horizon, or risk tolerance.</p>
+        <p>Price history alone does not establish valuation or business quality.</p>
+        <p>News, earnings, regulation, and unexpected events can invalidate a setup.</p>
+        <p>A high rank only compares securities included in the current run.</p>
+        <p>Always verify important information at the original data source.</p>
+      </div>
+      <div class="learn-finish"><div><p class="kicker">Ready to begin?</p><h2>Start with one ticker and four rounds.</h2></div><a class="learn-primary" href="/#analyze-form">Open the research desk →</a></div>
+    </section>
+  </main>
+  <footer>Northstar is educational research tooling, not investment advice or an offer to transact.</footer>
+</body>
+</html>
