@@ -8,7 +8,6 @@ const eventCount = document.querySelector("#event-count");
 const sourceBadge = document.querySelector("#source-badge");
 const runMeta = document.querySelector("#run-meta");
 const methodology = document.querySelector("#methodology");
-const themeToggle = document.querySelector("#theme-toggle");
 const analysisProgress = document.querySelector("#analysis-progress");
 const progressStage = document.querySelector("#progress-stage");
 const progressPercent = document.querySelector("#progress-percent");
@@ -41,26 +40,6 @@ let pulseDragStartScroll = 0;
 
 const agentInitial = {"Market Data":"M","Technical":"T","Bull":"B+","Bear":"B−","Risk":"R","Portfolio Manager":"PM"};
 const money = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:2});
-
-function applyTheme(theme, persist = true) {
-  const dark = theme === "dark";
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-  document.documentElement.style.colorScheme = dark ? "dark" : "light";
-  themeToggle.setAttribute("aria-pressed", String(dark));
-  themeToggle.setAttribute("aria-label", `Switch to ${dark ? "light" : "dark"} mode`);
-  themeToggle.querySelector(".theme-icon").textContent = dark ? "☀" : "☾";
-  themeToggle.querySelector(".theme-label").textContent = dark ? "Light" : "Dark";
-  if (persist) {
-    try {
-      localStorage.setItem("northstar-theme", dark ? "dark" : "light");
-    } catch (_) {}
-  }
-}
-
-applyTheme(document.documentElement.dataset.theme || "light", false);
-themeToggle.addEventListener("click", () => {
-  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
-});
 
 function parseTickers(value) {
   return [...new Set(value.split(",").map(value => value.trim().toUpperCase()).filter(Boolean))];
@@ -929,3 +908,6 @@ window.addEventListener("resize", () => {
 window.addEventListener("scroll", () => {
   if (!tour.hidden) updateTourGeometry();
 }, {passive:true});
+if (new URLSearchParams(window.location.search).get("tour") === "1") {
+  requestAnimationFrame(openTour);
+}

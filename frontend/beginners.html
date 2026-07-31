@@ -5,10 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="A beginner-friendly guide to using Northstar for stock research.">
   <title>Beginner Guide · Northstar</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("northstar-theme");
+        const theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch (_) {}
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260731f">
+  <link rel="stylesheet" href="style.css?v=20260731g">
 </head>
 <body>
   <header class="topbar">
@@ -19,6 +29,12 @@
       <a href="/news.html">News</a>
       <a href="/beginners.html" aria-current="page">Learn</a>
     </nav>
+    <div class="topbar-actions">
+      <a class="help-button" href="/?tour=1"><span aria-hidden="true">?</span> Help</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false">
+        <span class="theme-icon" aria-hidden="true">☾</span><span class="theme-label">Dark</span>
+      </button>
+    </div>
   </header>
 
   <main class="learn-page">
@@ -126,5 +142,6 @@
     </section>
   </main>
   <footer>Northstar is educational research tooling, not investment advice or an offer to transact.</footer>
+  <script src="site-shell.js?v=20260731g"></script>
 </body>
 </html>

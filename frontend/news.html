@@ -5,15 +5,36 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Northstar market news from attributed financial publishers.">
   <title>Market News · Northstar</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("northstar-theme");
+        const theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch (_) {}
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260731f">
+  <link rel="stylesheet" href="style.css?v=20260731g">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Return to Northstar"><span class="brand-mark">N</span><span>Northstar</span></a>
-    <a class="news-back" href="/">← Research desk</a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="/">Home</a>
+      <a href="/#workspace">Research</a>
+      <a href="/news.html" aria-current="page">News</a>
+      <a href="/beginners.html">Learn</a>
+    </nav>
+    <div class="topbar-actions">
+      <a class="help-button" href="/?tour=1"><span aria-hidden="true">?</span> Help</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false">
+        <span class="theme-icon" aria-hidden="true">☾</span><span class="theme-label">Dark</span>
+      </button>
+    </div>
   </header>
   <main class="all-news-page">
     <div class="all-news-heading">
@@ -27,6 +48,7 @@
     </div>
     <p id="all-news-status" class="pulse-status" aria-live="polite"></p>
   </main>
-  <script src="news.js?v=20260731e"></script>
+  <script src="site-shell.js?v=20260731g"></script>
+  <script src="news.js?v=20260731g"></script>
 </body>
 </html>
