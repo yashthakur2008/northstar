@@ -35,7 +35,7 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260731g" in page.text
+    assert "style.css?v=20260731h" in page.text
     assert "script.js?v=20260731g" in page.text
     assert "How to use Northstar" in page.text
     assert "Research systems operational" not in page.text
