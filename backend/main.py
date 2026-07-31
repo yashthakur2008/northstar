@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from engine import AnalysisEngine
 from models import AnalysisReport, AnalyzeRequest, AnalyzerPoint, MarketPulse, NewsItem, PricePoint, StockAnalysis, StockPulse
-from providers import MarketDataError, fetch_yahoo_analysis, fetch_yahoo_news
+from providers import MarketDataError, fetch_resilient_analysis, fetch_yahoo_news
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
@@ -82,7 +82,7 @@ async def market_pulse(
                 for timestamp, price in zip(snapshot.timestamps[-22:], snapshot.prices[-22:])
             ],
         ))
-    news = [NewsItem(**row) for row in news_rows]
+    news = [NewsItem(**row, is_trending=index < 2) for index, row in enumerate(news_rows)]
     status = "live" if len(stocks) == len(valid) and news else "partial" if stocks or news else "unavailable"
     return MarketPulse(stocks=stocks, news=news, generated_at=datetime.now(timezone.utc), source_status=status)
 
@@ -97,7 +97,7 @@ async def stock_analyzer(
     if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", normalized):
         raise HTTPException(status_code=422, detail="Enter a valid ticker symbol.")
     try:
-        result = await asyncio.to_thread(fetch_yahoo_analysis, normalized, period, interval)
+        result = await asyncio.to_thread(fetch_resilient_analysis, normalized, period, interval)
     except MarketDataError as exc:
         raise HTTPException(status_code=503, detail=f"Market history unavailable for {normalized}.") from exc
     rows = result["rows"]

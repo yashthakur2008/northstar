@@ -223,11 +223,14 @@ def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float
         published = item.get("providerPublishTime")
         if not title or not link or not published:
             continue
+        resolutions = (item.get("thumbnail") or {}).get("resolutions") or []
+        image_url = resolutions[-1].get("url") if resolutions else None
         items.append({
             "title": str(title),
             "publisher": str(item.get("publisher") or "Yahoo Finance"),
             "published_at": datetime.fromtimestamp(int(published), tz=timezone.utc),
             "url": str(link),
+            "image_url": image_url,
         })
     if not items:
         rss_urls = (
@@ -245,11 +248,21 @@ def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float
                     published = node.findtext("pubDate")
                     source = node.findtext("source") or "Market news"
                     if title and link and published:
+                        media = node.find("{http://search.yahoo.com/mrss/}content")
+                        if media is None:
+                            media = node.find("{http://search.yahoo.com/mrss/}thumbnail")
+                        enclosure = node.find("enclosure")
+                        image_url = media.get("url") if media is not None else None
+                        if not image_url and enclosure is not None and (
+                            enclosure.get("type") or ""
+                        ).startswith("image/"):
+                            image_url = enclosure.get("url")
                         items.append({
                             "title": title,
                             "publisher": source,
                             "published_at": parsedate_to_datetime(published).astimezone(timezone.utc),
                             "url": link,
+                            "image_url": image_url,
                         })
                 if items:
                     break
@@ -302,3 +315,78 @@ def fetch_yahoo_analysis(symbol: str, period: str, interval: str, timeout: float
         "rows": rows,
         "source": "Yahoo Finance chart API",
     }
+
+
+def fetch_nasdaq_analysis(symbol: str, period: str, interval: str, timeout: float = 10.0) -> dict:
+    """Independent OHLCV fallback for hosts that Yahoo rate-limits."""
+    lookback = {"1mo": 45, "3mo": 125, "6mo": 250, "1y": 410, "2y": 800}.get(period, 250)
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=lookback)
+    url = (
+        f"https://api.nasdaq.com/api/quote/{quote(symbol)}/historical"
+        f"?assetclass=stocks&fromdate={start:%Y-%m-%d}&todate={end:%Y-%m-%d}&limit=500"
+    )
+    request = Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (compatible; NorthstarResearch/1.0)",
+        "Accept": "application/json,text/plain,*/*",
+        "Referer": "https://www.nasdaq.com/",
+    })
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            payload = json.load(response)
+    except HTTPError as exc:
+        raise MarketDataError("Nasdaq", symbol, f"HTTP {exc.code}") from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise MarketDataError("Nasdaq", symbol, type(exc).__name__) from exc
+
+    rows: list[dict] = []
+    try:
+        raw_rows = payload["data"]["tradesTable"]["rows"]
+    except (KeyError, TypeError) as exc:
+        raise MarketDataError("Nasdaq", symbol, "invalid response") from exc
+    for item in raw_rows:
+        try:
+            rows.append({
+                "timestamp": datetime.strptime(item["date"], "%m/%d/%Y").replace(tzinfo=timezone.utc),
+                "open": round(float(item["open"].replace("$", "").replace(",", "")), 4),
+                "high": round(float(item["high"].replace("$", "").replace(",", "")), 4),
+                "low": round(float(item["low"].replace("$", "").replace(",", "")), 4),
+                "close": round(float(item["close"].replace("$", "").replace(",", "")), 4),
+                "volume": max(0, int(item["volume"].replace(",", ""))),
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+    rows.sort(key=lambda row: row["timestamp"])
+    if len(rows) < 2:
+        raise MarketDataError("Nasdaq", symbol, "insufficient history")
+
+    if interval == "1wk":
+        buckets: dict[tuple[int, int], list[dict]] = {}
+        for row in rows:
+            iso = row["timestamp"].isocalendar()
+            buckets.setdefault((iso.year, iso.week), []).append(row)
+        rows = [{
+            "timestamp": group[-1]["timestamp"],
+            "open": group[0]["open"],
+            "high": max(row["high"] for row in group),
+            "low": min(row["low"] for row in group),
+            "close": group[-1]["close"],
+            "volume": sum(row["volume"] for row in group),
+        } for group in buckets.values()]
+    return {"symbol": symbol, "currency": "USD", "rows": rows, "source": "Nasdaq historical API"}
+
+
+def fetch_resilient_analysis(symbol: str, period: str, interval: str) -> dict:
+    failures: list[str] = []
+    for provider in (fetch_yahoo_analysis, fetch_nasdaq_analysis):
+        try:
+            return provider(symbol, period, interval)
+        except MarketDataError as exc:
+            failures.append(f"{exc.provider}: {exc.reason}")
+            logger.warning(
+                "analysis_provider_failed provider=%s symbol=%s reason=%s",
+                exc.provider,
+                symbol,
+                exc.reason,
+            )
+    raise MarketDataError("all analysis providers", symbol, "; ".join(failures))

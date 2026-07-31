@@ -143,8 +143,8 @@ function animatePulse(timestamp) {
   const elapsed = Math.min(40, timestamp - (pulseLastFrame || timestamp));
   pulseLastFrame = timestamp;
   if (!matchMedia("(prefers-reduced-motion: reduce)").matches && timestamp >= pulseResumeAt && pulseSetWidth) {
-    const ramp = Math.min(1, (timestamp - pulseResumeAt) / 1800);
-    pulsePosition += .035 * ramp * elapsed;
+    const ramp = Math.min(1, (timestamp - pulseResumeAt) / 700);
+    pulsePosition += .085 * ramp * elapsed;
     normalizePulsePosition();
     updatePulseFocus();
   }
@@ -173,6 +173,14 @@ function openStockDetail(stock) {
   });
 }
 
+function analyzeFromPulse(stock) {
+  pausePulseForManual();
+  document.querySelector("#analyzer-symbol").value = stock.symbol;
+  document.querySelector("#analyzer-period").value = "3mo";
+  document.querySelector("#stock-analyzer").scrollIntoView({behavior:"smooth", block:"start"});
+  analyzerForm.requestSubmit();
+}
+
 function pulseCardMarkup(stock, index, copy) {
   const positive = stock.change_pct >= 0;
   const firstDate = new Date(stock.history[0].timestamp);
@@ -182,7 +190,7 @@ function pulseCardMarkup(stock, index, copy) {
     <div class="pulse-card-head"><strong>${escapeHtml(stock.symbol)}</strong><span class="${positive ? "positive" : "negative"}">${positive ? "+" : ""}${stock.change_pct.toFixed(2)}%</span></div>
     <div class="pulse-price">${money.format(stock.last_price)}</div>
     ${pulseGraphic(stock.history, positive, pulseFormat.value)}
-    <div class="pulse-card-foot"><span>${dateRange}</span><span>${escapeHtml(stock.source)}</span></div>
+    <div class="pulse-card-foot"><span>${dateRange}</span><span>Analyze ${escapeHtml(stock.symbol)} →</span></div>
   </button>`;
 }
 
@@ -192,7 +200,7 @@ function renderMarketPulse(payload) {
     pulseStocks = stocks;
     pulseTrack.innerHTML = [0, 1, 2].map(copy => stocks.map((stock, index) => pulseCardMarkup(stock, index, copy)).join("")).join("");
     pulseTrack.querySelectorAll(".pulse-card").forEach(card => card.addEventListener("click", () => {
-      if (!pulseDragMoved) openStockDetail(pulseStocks[Number(card.dataset.index)]);
+      if (!pulseDragMoved) analyzeFromPulse(pulseStocks[Number(card.dataset.index)]);
     }));
     requestAnimationFrame(() => {
       const first = pulseTrack.querySelector('.pulse-card[data-copy="1"]');
@@ -211,11 +219,22 @@ function renderMarketPulse(payload) {
   const news = payload.news || [];
   pulseNews = news;
   newsGrid.innerHTML = news.length ? news.map((item, index) => `
-    <a class="news-card${index === 0 ? " lead-news" : ""}" href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">
-      <span class="news-meta">${escapeHtml(item.publisher)} · ${new Date(item.published_at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span>
-      <strong>${escapeHtml(item.title)}</strong>
-      <span class="news-link">Read coverage <span aria-hidden="true">↗</span></span>
+    <a class="news-card${index === 0 ? " lead-news" : ""}${item.is_trending ? " is-trending" : ""}" href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">
+      <div class="news-visual${item.image_url ? "" : " is-fallback"}">
+        ${item.image_url ? `<img src="${escapeHtml(safeExternalUrl(item.image_url))}" alt="" loading="lazy">` : ""}
+        <span class="news-visual-label">${escapeHtml(item.publisher)}</span>
+        <svg viewBox="0 0 240 90" aria-hidden="true"><path d="M0 72 L30 61 L58 66 L87 35 L115 49 L145 21 L174 39 L206 14 L240 27"/></svg>
+      </div>
+      <div class="news-body">
+        <div class="news-byline">${item.is_trending ? `<span class="trending-badge">Trending</span>` : ""}<span class="news-meta">${escapeHtml(item.publisher)} · ${new Date(item.published_at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span></div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <span class="news-link">Read coverage <span aria-hidden="true">↗</span></span>
+      </div>
     </a>`).join("") : `<div class="news-loading">Headlines are temporarily unavailable. Stock updates remain live.</div>`;
+  newsGrid.querySelectorAll(".news-visual img").forEach(image => image.addEventListener("error", () => {
+    image.hidden = true;
+    image.parentElement.classList.add("is-fallback");
+  }, {once:true}));
 }
 
 async function loadMarketPulse(symbols = []) {
@@ -229,14 +248,6 @@ async function loadMarketPulse(symbols = []) {
   }
 }
 
-document.querySelector("#pulse-prev").addEventListener("click", () => {
-  setPulseIndex(pulseIndex - 1);
-  pausePulseForManual();
-});
-document.querySelector("#pulse-next").addEventListener("click", () => {
-  setPulseIndex(pulseIndex + 1);
-  pausePulseForManual();
-});
 pulseFormat.addEventListener("change", () => {
   if (pulseStocks.length) renderMarketPulse({stocks:pulseStocks, news:pulseNews, generated_at:new Date().toISOString()});
 });

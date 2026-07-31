@@ -35,8 +35,8 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260731a" in page.text
-    assert "script.js?v=20260731a" in page.text
+    assert "style.css?v=20260731b" in page.text
+    assert "script.js?v=20260731b" in page.text
 
 
 def test_request_validation() -> None:
@@ -80,7 +80,7 @@ def test_stock_analyzer_returns_ohlcv_metrics(monkeypatch) -> None:
         }
         for index in range(12)
     ]
-    monkeypatch.setattr(main, "fetch_yahoo_analysis", lambda symbol, period, interval: {
+    monkeypatch.setattr(main, "fetch_resilient_analysis", lambda symbol, period, interval: {
         "symbol": symbol,
         "currency": "USD",
         "rows": rows,

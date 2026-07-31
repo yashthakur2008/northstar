@@ -96,6 +96,8 @@ class NewsItem(BaseModel):
     publisher: str
     published_at: datetime
     url: str
+    image_url: str | None = None
+    is_trending: bool = False
 
 
 class MarketPulse(BaseModel):
