@@ -224,8 +224,14 @@ def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float
         published = item.get("providerPublishTime")
         if not title or not link or not published:
             continue
-        resolutions = (item.get("thumbnail") or {}).get("resolutions") or []
-        image_url = resolutions[-1].get("url") if resolutions else None
+        thumbnail = item.get("thumbnail") or {}
+        resolutions = thumbnail.get("resolutions") or []
+        largest = max(
+            resolutions,
+            key=lambda image: (image.get("width") or 0) * (image.get("height") or 0),
+            default={},
+        )
+        image_url = thumbnail.get("originalUrl") or largest.get("url")
         items.append({
             "title": str(title),
             "publisher": str(item.get("publisher") or "Yahoo Finance"),

@@ -37,6 +37,14 @@ fetch("/api/market-pulse")
       image.parentElement.remove();
       article.classList.add("no-image");
     }, {once:true}));
+    grid.querySelectorAll(".news-visual img").forEach(image => {
+      const applyPreset = () => {
+        const article = image.closest(".news-card");
+        article.classList.toggle("portrait-image", image.naturalHeight > image.naturalWidth * 1.08);
+        article.classList.toggle("landscape-image", image.naturalWidth >= image.naturalHeight * 1.08);
+      };
+      image.complete ? applyPreset() : image.addEventListener("load", applyPreset, {once:true});
+    });
     statusEl.textContent = `${news.length} attributed articles · Updated ${new Date(payload.generated_at).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`;
   })
   .catch(() => {

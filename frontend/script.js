@@ -245,6 +245,14 @@ function renderNewsCards() {
     image.parentElement.remove();
     card.classList.add("no-image");
   }, {once:true}));
+  newsGrid.querySelectorAll(".news-visual img").forEach(image => {
+    const applyPreset = () => {
+      const card = image.closest(".news-card");
+      card.classList.toggle("portrait-image", image.naturalHeight > image.naturalWidth * 1.08);
+      card.classList.toggle("landscape-image", image.naturalWidth >= image.naturalHeight * 1.08);
+    };
+    image.complete ? applyPreset() : image.addEventListener("load", applyPreset, {once:true});
+  });
   newsMore.hidden = !pulseNews.length;
   newsMore.textContent = newsMoreSelections >= 2 ? "View all market news →" : "Show more articles";
 }
@@ -656,12 +664,6 @@ function renderReport(report) {
   sourceBadge.dataset.status = report.source_status;
   runMeta.textContent = `${report.top_trades.length} ranked by conviction · ${new Date(report.generated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
   methodology.textContent = `${report.methodology} ${report.market_context}`;
-  const system = document.querySelector(".system");
-  if (system) {
-    system.innerHTML = report.source_status === "unavailable"
-      ? `<span class="pulse pulse-warn"></span> Market data unavailable`
-      : `<span class="pulse"></span> Research systems operational`;
-  }
   if (!report.top_trades.length) {
     resultsEl.innerHTML = `<div class="empty"><strong>No prediction issued</strong><p>Market data could not be validated. Try again shortly or verify the symbols.</p></div>`;
     return;
@@ -671,16 +673,17 @@ function renderReport(report) {
     const card = document.createElement("article");
     card.className = "trade";
     card.dataset.rank = String(index + 1);
-    const expanded = !hasMultiple || index === 0;
+    const expanded = !hasMultiple;
     card.innerHTML = `
       <div class="trade-top">
         <div><span class="rank" title="Conviction rank">#${index + 1}${index === 0 ? " · TOP" : ""}</span><h3>${escapeHtml(trade.symbol)}</h3>
           <span class="direction" data-direction="${trade.direction}">${escapeHtml(trade.direction)}</span></div>
         <div class="trade-actions">
-          <div class="score"><strong>${trade.score > 0 ? "+" : ""}${trade.score.toFixed(1)}</strong><span>signal score</span></div>
+          <div class="score"><strong>${trade.score > 0 ? "+" : ""}${trade.score.toFixed(1)}</strong><span>signal score <button class="score-help" type="button" aria-label="Explain signal score" aria-expanded="false">?</button></span></div>
           ${hasMultiple ? `<button class="trade-expand" type="button" aria-expanded="${expanded}">${expanded ? "Condense" : "View analysis"}</button>` : ""}
         </div>
       </div>
+      <p class="score-explanation" hidden><strong>Signal score</strong> runs from −100 (strongly bearish evidence) to +100 (strongly bullish evidence). It combines recent price momentum with the multi-window debate, then applies a volatility and risk haircut. It ranks evidence strength; it is not a return forecast.</p>
       <div class="metrics">
         <div><span>Last close</span><strong>${trade.last_price == null ? "—" : money.format(trade.last_price)}</strong></div>
         <div><span>Daily move</span><strong class="${trade.change_pct >= 0 ? "positive" : "negative"}">${trade.change_pct == null ? "—" : `${trade.change_pct > 0 ? "+" : ""}${trade.change_pct.toFixed(2)}%`}</strong></div>
@@ -697,6 +700,11 @@ function renderReport(report) {
         </details>
       </div>`;
     resultsEl.appendChild(card);
+    card.querySelector(".score-help").addEventListener("click", event => {
+      const explanation = card.querySelector(".score-explanation");
+      explanation.hidden = !explanation.hidden;
+      event.currentTarget.setAttribute("aria-expanded", String(!explanation.hidden));
+    });
     renderDebateChart(card.querySelector(".debate-chart-widget"), trade);
     renderPriceChart(card.querySelector(".chart-widget"), trade);
     card.querySelector(".trade-expand")?.addEventListener("click", event => {

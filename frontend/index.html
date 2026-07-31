@@ -17,14 +17,19 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260731d">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20260731e">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Northstar home"><span class="brand-mark">N</span><span>Northstar</span></a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="/">Home</a>
+      <a href="#workspace">Research</a>
+      <a href="/news.html">News</a>
+      <a href="#quick-guide">Guide</a>
+    </nav>
     <div class="topbar-actions">
-      <div class="system"><span class="pulse"></span> Research systems operational</div>
       <button id="help-button" class="help-button" type="button" aria-label="Open guided help">
         <span aria-hidden="true">?</span> Help
       </button>
@@ -55,6 +60,15 @@
         </div>
         <p id="status" class="status" role="status" aria-live="polite">Ready for a new mandate.</p>
       </form>
+    </section>
+
+    <section id="quick-guide" class="quick-guide" aria-labelledby="guide-title">
+      <div class="guide-intro"><p class="kicker">Three-step workflow</p><h2 id="guide-title">How to use Northstar</h2></div>
+      <ol>
+        <li><span>01</span><div><strong>Choose the universe</strong><p>Enter one to five ticker symbols and select how many research rounds should challenge each case.</p></div></li>
+        <li><span>02</span><div><strong>Compare the debate</strong><p>Follow Bull, Bear, and Risk as they test different time windows, then compare the ranked PM scorecards.</p></div></li>
+        <li><span>03</span><div><strong>Inspect the evidence</strong><p>Open a result for its decision path, price history, source dates, and the conditions that could invalidate it.</p></div></li>
+      </ol>
     </section>
 
     <section id="market-pulse" class="market-pulse" aria-labelledby="pulse-title">
@@ -162,6 +176,6 @@
       </div>
     </section>
   </div>
-  <script src="script.js?v=20260731d"></script>
+  <script src="script.js?v=20260731e"></script>
 </body>
 </html>
