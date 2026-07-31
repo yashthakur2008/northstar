@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260731a">
 </head>
 <body>
   <header class="topbar">
@@ -75,7 +75,10 @@
       </div>
       <div id="pulse-viewport" class="pulse-viewport" tabindex="0" aria-label="Recent stock updates">
         <div id="pulse-track" class="pulse-track">
-          <div class="pulse-loading">Loading current market snapshots…</div>
+          <div class="pulse-skeleton" aria-label="Loading market snapshots"><i></i><b></b><span></span></div>
+          <div class="pulse-skeleton" aria-hidden="true"><i></i><b></b><span></span></div>
+          <div class="pulse-skeleton" aria-hidden="true"><i></i><b></b><span></span></div>
+          <div class="pulse-skeleton" aria-hidden="true"><i></i><b></b><span></span></div>
         </div>
       </div>
       <p id="pulse-status" class="pulse-status" aria-live="polite">Live daily market history from the same resilient data layer used by the research desk.</p>
@@ -102,7 +105,9 @@
         <span>Live headlines with cached and RSS provider fallback</span>
       </div>
       <div id="news-grid" class="news-grid">
-        <div class="news-loading">Gathering the latest headlines…</div>
+        <div class="news-skeleton"><i></i><b></b><span></span></div>
+        <div class="news-skeleton"><i></i><b></b><span></span></div>
+        <div class="news-skeleton"><i></i><b></b><span></span></div>
       </div>
     </section>
 
@@ -156,6 +161,6 @@
       </div>
     </section>
   </div>
-  <script src="script.js"></script>
+  <script src="script.js?v=20260731a"></script>
 </body>
 </html>

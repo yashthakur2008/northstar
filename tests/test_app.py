@@ -27,6 +27,18 @@ def test_health() -> None:
     assert response.json()["version"] == "1.0.0"
 
 
+def test_frontend_assets_cannot_mix_across_deployments() -> None:
+    client = TestClient(app)
+    page = client.get("/")
+    stylesheet = client.get("/style.css")
+    script = client.get("/script.js")
+    assert "no-store" in page.headers["cache-control"]
+    assert "no-store" in stylesheet.headers["cache-control"]
+    assert "no-store" in script.headers["cache-control"]
+    assert "style.css?v=20260731a" in page.text
+    assert "script.js?v=20260731a" in page.text
+
+
 def test_request_validation() -> None:
     client = TestClient(app)
     assert client.post("/api/analyze", json={"tickers": ["bad ticker"]}).status_code == 422

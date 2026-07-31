@@ -38,6 +38,15 @@ if allowed_origins:
     )
 
 
+@app.middleware("http")
+async def prevent_mixed_frontend_versions(request, call_next):
+    response = await call_next(request)
+    if request.url.path in {"/", "/index.html", "/style.css", "/script.js"}:
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "version": app.version, "market_data": "Yahoo Finance with Nasdaq fallback"}
