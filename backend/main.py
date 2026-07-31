@@ -5,19 +5,21 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from engine import AnalysisEngine
-from models import AnalysisReport, AnalyzeRequest, MarketPulse, NewsItem, PricePoint, StockPulse
-from providers import fetch_yahoo_news
+from models import AnalysisReport, AnalyzeRequest, AnalyzerPoint, MarketPulse, NewsItem, PricePoint, StockAnalysis, StockPulse
+from providers import MarketDataError, fetch_yahoo_analysis, fetch_yahoo_news
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
@@ -43,12 +45,15 @@ async def health() -> dict[str, str]:
 
 @app.get("/api/market-pulse", response_model=MarketPulse)
 async def market_pulse(
-    symbols: str = Query(default="SPY,QQQ,NVDA,AAPL,MSFT,TSLA", max_length=80),
+    symbols: str = Query(
+        default="SPY,QQQ,DIA,IWM,AAPL,MSFT,NVDA,AMZN,GOOGL,META,TSLA,BRK-B",
+        max_length=120,
+    ),
 ) -> MarketPulse:
     requested = list(dict.fromkeys(part.strip().upper() for part in symbols.split(",") if part.strip()))
-    valid = [symbol for symbol in requested if re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol)][:6]
+    valid = [symbol for symbol in requested if re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol)][:12]
     if not valid:
-        valid = ["SPY", "QQQ", "NVDA", "AAPL", "MSFT", "TSLA"]
+        valid = ["SPY", "QQQ", "DIA", "IWM", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "BRK-B"]
     snapshots, news_rows = await asyncio.gather(
         asyncio.gather(*(engine.provider.fetch(symbol) for symbol in valid), return_exceptions=True),
         asyncio.to_thread(fetch_yahoo_news),
@@ -71,6 +76,43 @@ async def market_pulse(
     news = [NewsItem(**row) for row in news_rows]
     status = "live" if len(stocks) == len(valid) and news else "partial" if stocks or news else "unavailable"
     return MarketPulse(stocks=stocks, news=news, generated_at=datetime.now(timezone.utc), source_status=status)
+
+
+@app.get("/api/stock-analyzer", response_model=StockAnalysis)
+async def stock_analyzer(
+    symbol: str = Query(default="NVDA", min_length=1, max_length=10),
+    period: Literal["1mo", "3mo", "6mo", "1y", "2y"] = "6mo",
+    interval: Literal["1d", "1wk"] = "1d",
+) -> StockAnalysis:
+    normalized = symbol.strip().upper()
+    if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", normalized):
+        raise HTTPException(status_code=422, detail="Enter a valid ticker symbol.")
+    try:
+        result = await asyncio.to_thread(fetch_yahoo_analysis, normalized, period, interval)
+    except MarketDataError as exc:
+        raise HTTPException(status_code=503, detail=f"Market history unavailable for {normalized}.") from exc
+    rows = result["rows"]
+    closes = [row["close"] for row in rows]
+    returns = [(closes[index] / closes[index - 1]) - 1 for index in range(1, len(closes))]
+    mean = sum(returns) / len(returns)
+    variance = sum((value - mean) ** 2 for value in returns) / max(len(returns) - 1, 1)
+    annual_periods = 52 if interval == "1wk" else 252
+    return StockAnalysis(
+        symbol=normalized,
+        period=period,
+        interval=interval,
+        currency=result["currency"],
+        last_price=round(closes[-1], 2),
+        change_pct=round(returns[-1] * 100, 2),
+        period_return=round(((closes[-1] / closes[0]) - 1) * 100, 2),
+        period_high=round(max(row["high"] for row in rows), 2),
+        period_low=round(min(row["low"] for row in rows), 2),
+        average_volume=round(sum(row["volume"] for row in rows) / len(rows)),
+        volatility=round(math.sqrt(variance) * math.sqrt(annual_periods) * 100, 2),
+        as_of=rows[-1]["timestamp"],
+        source=result["source"],
+        history=[AnalyzerPoint(**row) for row in rows],
+    )
 
 
 @app.post("/api/analyze", response_model=AnalysisReport)

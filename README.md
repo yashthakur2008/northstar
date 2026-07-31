@@ -16,8 +16,9 @@ Manager verdict as a streamed event sequence.
 - Three-way Bull → Bear rebuttal → Risk adjudication in every round
 - Live stage progress and explicit cross-stock conviction ranking
 - Interactive, source-attributed 1M/3M price charts with pointer and keyboard inspection
-- Self-advancing market pulse with current one-month mini charts and motion controls
-- Separate, timestamped market-news section with outbound source links
+- Seamless, continuously scrolling market tape with center magnification, manual drag/scroll, and line/range-box formats
+- Click-through stock details plus an OHLCV Stock Analyzer with 1M–2Y periods, daily/weekly intervals, and line/candlestick views
+- Separate, timestamped market-news section with outbound source links, stale-cache protection, and RSS failover
 - Context-aware guided Help tour for every major research surface
 - Persistent light/dark theme control with first-visit system preference
 - Typed contracts, same-origin security defaults, health check, and API docs
@@ -59,6 +60,7 @@ Open <http://localhost:8000>; API docs are at <http://localhost:8000/api/docs>.
 - `POST /api/analyze` — complete JSON report
 - `POST /api/analyze/stream` — SSE `status`, `debate`, and `report` events
 - `GET /api/market-pulse` — recent stock snapshots, mini-chart history, and current headlines
+- `GET /api/stock-analyzer` — validated OHLCV history and derived range, return, volume, and volatility metrics
 
 ```json
 {"tickers": ["NVDA", "MSFT"], "debate_rounds": 2}

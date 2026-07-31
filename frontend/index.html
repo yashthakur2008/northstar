@@ -65,7 +65,11 @@
         </div>
         <div class="pulse-controls" aria-label="Market pulse controls">
           <button id="pulse-prev" type="button" aria-label="Previous stock">←</button>
-          <button id="pulse-pause" type="button" aria-pressed="false">Pause</button>
+          <label for="pulse-format">Format</label>
+          <select id="pulse-format" aria-label="Market graph format">
+            <option value="line">Stock lines</option>
+            <option value="box">Range boxes</option>
+          </select>
           <button id="pulse-next" type="button" aria-label="Next stock">→</button>
         </div>
       </div>
@@ -76,9 +80,26 @@
       </div>
       <p id="pulse-status" class="pulse-status" aria-live="polite">Live daily market history from the same resilient data layer used by the research desk.</p>
 
+      <section id="stock-analyzer" class="stock-analyzer" aria-labelledby="analyzer-title">
+        <div class="analyzer-heading">
+          <div><p class="kicker">Independent chart workspace</p><h2 id="analyzer-title">Stock Analyzer</h2></div>
+          <span>Historical screening data—not a forecast</span>
+        </div>
+        <form id="analyzer-form" class="analyzer-form">
+          <label>Ticker<input id="analyzer-symbol" name="symbol" value="NVDA" maxlength="10" required></label>
+          <label>Period<select id="analyzer-period" name="period"><option value="1mo">1 month</option><option value="3mo">3 months</option><option value="6mo" selected>6 months</option><option value="1y">1 year</option><option value="2y">2 years</option></select></label>
+          <label>Interval<select id="analyzer-interval" name="interval"><option value="1d">Daily</option><option value="1wk">Weekly</option></select></label>
+          <label>Chart<select id="analyzer-chart-type" name="chart"><option value="line">Line</option><option value="candle">Candlestick</option></select></label>
+          <button id="analyzer-submit" type="submit">Analyze stock →</button>
+        </form>
+        <div id="analyzer-output" class="analyzer-output" aria-live="polite">
+          <div class="analyzer-empty">Choose a ticker, period, interval, and chart style to inspect its market history.</div>
+        </div>
+      </section>
+
       <div class="news-heading">
         <div><p class="kicker">Latest coverage</p><h2>Market news</h2></div>
-        <span>Headlines open at their original Yahoo Finance destination</span>
+        <span>Live headlines with cached and RSS provider fallback</span>
       </div>
       <div id="news-grid" class="news-grid">
         <div class="news-loading">Gathering the latest headlines…</div>
@@ -112,6 +133,11 @@
   </main>
 
   <footer>Research tooling for educational use. Screen outputs are not investment advice or an offer to transact.</footer>
+
+  <dialog id="stock-detail" class="stock-detail">
+    <button id="detail-close" class="detail-close" type="button" aria-label="Close stock detail">×</button>
+    <div id="detail-content"></div>
+  </dialog>
 
   <div id="tour" class="tour" hidden>
     <div class="tour-shade" aria-hidden="true"></div>

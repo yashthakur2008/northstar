@@ -56,6 +56,36 @@ def test_market_pulse_is_typed_and_resilient(monkeypatch) -> None:
     assert body["news"][0]["publisher"] == "Test publisher"
 
 
+def test_stock_analyzer_returns_ohlcv_metrics(monkeypatch) -> None:
+    rows = [
+        {
+            "timestamp": datetime.fromtimestamp(1_700_000_000 + index * 86_400, tz=timezone.utc),
+            "open": 100.0 + index,
+            "high": 102.0 + index,
+            "low": 99.0 + index,
+            "close": 101.0 + index,
+            "volume": 1_000_000 + index * 10_000,
+        }
+        for index in range(12)
+    ]
+    monkeypatch.setattr(main, "fetch_yahoo_analysis", lambda symbol, period, interval: {
+        "symbol": symbol,
+        "currency": "USD",
+        "rows": rows,
+        "source": "Test chart source",
+    })
+    response = TestClient(app).get("/api/stock-analyzer?symbol=TEST&period=6mo&interval=1d")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["symbol"] == "TEST"
+    assert body["period"] == "6mo"
+    assert len(body["history"]) == 12
+    assert body["period_high"] == 113.0
+    assert body["period_low"] == 99.0
+    assert body["average_volume"] > 1_000_000
+    assert body["volatility"] >= 0
+
+
 async def test_engine_is_deterministic_and_traced() -> None:
     report = await AnalysisEngine(StubProvider()).analyze(AnalyzeRequest(tickers=["TEST"], debate_rounds=2))
     assert report.source_status == "live"

@@ -103,3 +103,29 @@ class MarketPulse(BaseModel):
     news: list[NewsItem]
     generated_at: datetime
     source_status: Literal["live", "partial", "unavailable"]
+
+
+class AnalyzerPoint(BaseModel):
+    timestamp: datetime
+    open: float = Field(gt=0)
+    high: float = Field(gt=0)
+    low: float = Field(gt=0)
+    close: float = Field(gt=0)
+    volume: int = Field(ge=0)
+
+
+class StockAnalysis(BaseModel):
+    symbol: str
+    period: Literal["1mo", "3mo", "6mo", "1y", "2y"]
+    interval: Literal["1d", "1wk"]
+    currency: str
+    last_price: float = Field(gt=0)
+    change_pct: float
+    period_return: float
+    period_high: float = Field(gt=0)
+    period_low: float = Field(gt=0)
+    average_volume: int = Field(ge=0)
+    volatility: float = Field(ge=0)
+    as_of: datetime
+    source: str
+    history: list[AnalyzerPoint]

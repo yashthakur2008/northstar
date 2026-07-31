@@ -7,14 +7,17 @@ import json
 import logging
 import math
 import time
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
+_news_cache: tuple[float, list[dict]] | None = None
 
 
 @dataclass(frozen=True)
@@ -198,7 +201,10 @@ class ResilientMarketData:
 
 
 def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float = 7.0) -> list[dict]:
-    """Fetch a small, source-labeled headline set without making news critical-path data."""
+    """Fetch source-labeled headlines with RSS and stale-cache failover."""
+    global _news_cache
+    if _news_cache and time.monotonic() - _news_cache[0] < 300:
+        return _news_cache[1][:limit]
     url = (
         "https://query1.finance.yahoo.com/v1/finance/search?"
         f"q={quote(query)}&quotesCount=0&newsCount={max(1, min(limit, 10))}"
@@ -209,7 +215,7 @@ def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float
             payload = json.load(response)
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         logger.warning("news_provider_failed provider=Yahoo Finance reason=%s", type(exc).__name__)
-        return []
+        payload = {}
     items: list[dict] = []
     for item in payload.get("news", []):
         title = item.get("title")
@@ -223,4 +229,76 @@ def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float
             "published_at": datetime.fromtimestamp(int(published), tz=timezone.utc),
             "url": str(link),
         })
-    return items[:limit]
+    if not items:
+        rss_urls = (
+            "https://feeds.finance.yahoo.com/rss/2.0/headline?s=SPY,QQQ&region=US&lang=en-US",
+            f"https://news.google.com/rss/search?q={quote(query)}&hl=en-US&gl=US&ceid=US:en",
+        )
+        for rss_url in rss_urls:
+            try:
+                request = Request(rss_url, headers={"User-Agent": "NorthstarResearch/1.0"})
+                with urlopen(request, timeout=timeout) as response:
+                    root = ET.parse(response).getroot()
+                for node in root.findall(".//item"):
+                    title = node.findtext("title")
+                    link = node.findtext("link")
+                    published = node.findtext("pubDate")
+                    source = node.findtext("source") or "Market news"
+                    if title and link and published:
+                        items.append({
+                            "title": title,
+                            "publisher": source,
+                            "published_at": parsedate_to_datetime(published).astimezone(timezone.utc),
+                            "url": link,
+                        })
+                if items:
+                    break
+            except (HTTPError, URLError, TimeoutError, ET.ParseError, ValueError) as exc:
+                logger.warning("news_rss_failed url=%s reason=%s", rss_url, type(exc).__name__)
+    if items:
+        _news_cache = (time.monotonic(), items[:limit])
+        return items[:limit]
+    if _news_cache:
+        return _news_cache[1][:limit]
+    return []
+
+
+def fetch_yahoo_analysis(symbol: str, period: str, interval: str, timeout: float = 9.0) -> dict:
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/"
+        f"{quote(symbol)}?range={quote(period)}&interval={quote(interval)}&events=div%2Csplits"
+    )
+    request = Request(url, headers={"User-Agent": "NorthstarResearch/1.0"})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            payload = json.load(response)
+    except HTTPError as exc:
+        raise MarketDataError("Yahoo Finance", symbol, f"HTTP {exc.code}") from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise MarketDataError("Yahoo Finance", symbol, type(exc).__name__) from exc
+    try:
+        result = payload["chart"]["result"][0]
+        quote_rows = result["indicators"]["quote"][0]
+        timestamps = result["timestamp"]
+        meta = result.get("meta", {})
+        rows = []
+        for index, timestamp in enumerate(timestamps):
+            values = {field: quote_rows.get(field, [None] * len(timestamps))[index] for field in ("open", "high", "low", "close")}
+            if any(value is None for value in values.values()):
+                continue
+            volume = quote_rows.get("volume", [0] * len(timestamps))[index] or 0
+            rows.append({
+                "timestamp": datetime.fromtimestamp(int(timestamp), tz=timezone.utc),
+                **{field: round(float(value), 4) for field, value in values.items()},
+                "volume": max(0, int(volume)),
+            })
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise MarketDataError("Yahoo Finance", symbol, "invalid response") from exc
+    if len(rows) < 2:
+        raise MarketDataError("Yahoo Finance", symbol, "insufficient history")
+    return {
+        "symbol": symbol,
+        "currency": str(meta.get("currency") or "USD"),
+        "rows": rows,
+        "source": "Yahoo Finance chart API",
+    }

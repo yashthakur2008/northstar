@@ -17,10 +17,23 @@ const pulseViewport = document.querySelector("#pulse-viewport");
 const pulseTrack = document.querySelector("#pulse-track");
 const pulseStatus = document.querySelector("#pulse-status");
 const newsGrid = document.querySelector("#news-grid");
-const pulsePause = document.querySelector("#pulse-pause");
+const pulseFormat = document.querySelector("#pulse-format");
+const stockDetail = document.querySelector("#stock-detail");
+const detailContent = document.querySelector("#detail-content");
+const analyzerForm = document.querySelector("#analyzer-form");
+const analyzerOutput = document.querySelector("#analyzer-output");
 let pulseIndex = 0;
-let pulseTimer = null;
-let pulsePaused = false;
+let pulseStocks = [];
+let pulseNews = [];
+let pulseFrame = null;
+let pulseLastFrame = 0;
+let pulseResumeAt = 0;
+let pulseSetWidth = 0;
+let pulsePosition = 0;
+let pulseDragging = false;
+let pulseDragMoved = false;
+let pulseDragStartX = 0;
+let pulseDragStartScroll = 0;
 
 const agentInitial = {"Market Data":"M","Technical":"T","Bull":"B+","Bear":"B−","Risk":"R","Portfolio Manager":"PM"};
 const money = new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:2});
@@ -62,7 +75,7 @@ function safeExternalUrl(value) {
   }
 }
 
-function miniChart(points, positive) {
+function pulseGraphic(points, positive, format = "line") {
   if (!points || points.length < 2) return "";
   const width = 260;
   const height = 74;
@@ -71,49 +84,132 @@ function miniChart(points, positive) {
   const max = Math.max(...values);
   const x = index => (index / (points.length - 1)) * width;
   const y = value => 4 + ((max - value) / Math.max(max - min, .01)) * (height - 8);
+  if (format === "box") {
+    const selected = points.slice(-16);
+    return `<div class="pulse-boxes" role="img" aria-label="Daily price range boxes">${selected.map((point, index) => {
+      const previous = selected[Math.max(0, index - 1)].close;
+      const heightPct = 28 + ((point.close - min) / Math.max(max - min, .01)) * 72;
+      return `<i class="${point.close >= previous ? "up" : "down"}" style="height:${heightPct.toFixed(1)}%" title="${money.format(point.close)}"></i>`;
+    }).join("")}</div>`;
+  }
   const path = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.close).toFixed(1)}`).join(" ");
-  return `<svg class="pulse-chart ${positive ? "positive-chart" : "negative-chart"}" viewBox="0 0 ${width} ${height}" role="img" aria-label="One month price trend"><path d="${path}"/></svg>`;
+  return `<svg class="pulse-chart ${positive ? "positive-chart" : "negative-chart"}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Recent closing-price trend"><path d="${path}"/></svg>`;
+}
+
+function updatePulseFocus() {
+  const cards = [...pulseTrack.querySelectorAll(".pulse-card")];
+  if (!cards.length) return;
+  const center = pulseViewport.scrollLeft + pulseViewport.clientWidth / 2;
+  let nearest = cards[0];
+  let distance = Infinity;
+  cards.forEach(card => {
+    const cardDistance = Math.abs(card.offsetLeft + card.offsetWidth / 2 - center);
+    if (cardDistance < distance) {
+      distance = cardDistance;
+      nearest = card;
+    }
+  });
+  cards.forEach(card => card.classList.toggle("is-active", card === nearest));
+  pulseIndex = Number(nearest.dataset.index);
 }
 
 function setPulseIndex(index, behavior = "smooth") {
-  const cards = [...pulseTrack.querySelectorAll(".pulse-card")];
+  const cards = [...pulseTrack.querySelectorAll('.pulse-card[data-copy="1"]')];
   if (!cards.length) return;
   pulseIndex = (index + cards.length) % cards.length;
-  cards.forEach((card, cardIndex) => card.classList.toggle("is-active", cardIndex === pulseIndex));
   const card = cards[pulseIndex];
+  pulsePosition = card.offsetLeft - (pulseViewport.clientWidth - card.offsetWidth) / 2;
   pulseViewport.scrollTo({
-    left: card.offsetLeft - (pulseViewport.clientWidth - card.offsetWidth) / 2,
+    left: pulsePosition,
     behavior,
+  });
+  updatePulseFocus();
+}
+
+function pausePulseForManual() {
+  pulseResumeAt = performance.now() + 5000;
+}
+
+function normalizePulsePosition() {
+  const middle = pulseTrack.querySelector('.pulse-card[data-copy="1"]');
+  const final = pulseTrack.querySelector('.pulse-card[data-copy="2"]');
+  if (!middle || !final || !pulseSetWidth) return;
+  if (pulsePosition >= final.offsetLeft) pulsePosition -= pulseSetWidth;
+  if (pulsePosition < middle.offsetLeft - pulseSetWidth * .15) pulsePosition += pulseSetWidth;
+  pulseViewport.scrollLeft = pulsePosition;
+}
+
+function animatePulse(timestamp) {
+  const elapsed = Math.min(40, timestamp - (pulseLastFrame || timestamp));
+  pulseLastFrame = timestamp;
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches && timestamp >= pulseResumeAt && pulseSetWidth) {
+    const ramp = Math.min(1, (timestamp - pulseResumeAt) / 1800);
+    pulsePosition += .035 * ramp * elapsed;
+    normalizePulsePosition();
+    updatePulseFocus();
+  }
+  pulseFrame = requestAnimationFrame(animatePulse);
+}
+
+function openStockDetail(stock) {
+  const points = stock.history || [];
+  const positive = stock.change_pct >= 0;
+  const firstDate = new Date(points[0].timestamp);
+  const lastDate = new Date(points.at(-1).timestamp);
+  detailContent.innerHTML = `
+    <p class="kicker">Market snapshot</p>
+    <div class="detail-title"><div><h2>${escapeHtml(stock.symbol)}</h2><span>${firstDate.toLocaleDateString()}–${lastDate.toLocaleDateString()}</span></div><strong class="${positive ? "positive" : "negative"}">${positive ? "+" : ""}${stock.change_pct.toFixed(2)}%</strong></div>
+    <div class="detail-price">${money.format(stock.last_price)}</div>
+    <div class="detail-chart">${pulseGraphic(points, positive, "line")}</div>
+    <div class="detail-meta"><span>Latest close <strong>${lastDate.toLocaleDateString()}</strong></span><span>Data source <strong>${escapeHtml(stock.source)}</strong></span></div>
+    <button id="detail-analyze" type="button">Open in Stock Analyzer →</button>`;
+  stockDetail.showModal();
+  document.querySelector("#detail-analyze").addEventListener("click", () => {
+    document.querySelector("#analyzer-symbol").value = stock.symbol;
+    document.querySelector("#analyzer-period").value = "3mo";
+    stockDetail.close();
+    document.querySelector("#stock-analyzer").scrollIntoView({behavior:"smooth", block:"start"});
+    analyzerForm.requestSubmit();
   });
 }
 
-function startPulseTimer() {
-  clearInterval(pulseTimer);
-  if (pulsePaused || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  pulseTimer = setInterval(() => setPulseIndex(pulseIndex + 1), 3200);
+function pulseCardMarkup(stock, index, copy) {
+  const positive = stock.change_pct >= 0;
+  const firstDate = new Date(stock.history[0].timestamp);
+  const lastDate = new Date(stock.history.at(-1).timestamp);
+  const dateRange = `${firstDate.toLocaleDateString([], {month:"short", day:"numeric"})}–${lastDate.toLocaleDateString([], {month:"short", day:"numeric", year:"numeric"})}`;
+  return `<button class="pulse-card" type="button" data-symbol="${escapeHtml(stock.symbol)}" data-index="${index}" data-copy="${copy}" aria-label="Open ${escapeHtml(stock.symbol)} detailed chart">
+    <div class="pulse-card-head"><strong>${escapeHtml(stock.symbol)}</strong><span class="${positive ? "positive" : "negative"}">${positive ? "+" : ""}${stock.change_pct.toFixed(2)}%</span></div>
+    <div class="pulse-price">${money.format(stock.last_price)}</div>
+    ${pulseGraphic(stock.history, positive, pulseFormat.value)}
+    <div class="pulse-card-foot"><span>${dateRange}</span><span>${escapeHtml(stock.source)}</span></div>
+  </button>`;
 }
 
 function renderMarketPulse(payload) {
   const stocks = payload.stocks || [];
   if (stocks.length) {
-    pulseTrack.innerHTML = stocks.map(stock => {
-      const positive = stock.change_pct >= 0;
-      return `<article class="pulse-card">
-        <div class="pulse-card-head"><strong>${escapeHtml(stock.symbol)}</strong><span class="${positive ? "positive" : "negative"}">${positive ? "+" : ""}${stock.change_pct.toFixed(2)}%</span></div>
-        <div class="pulse-price">${money.format(stock.last_price)}</div>
-        ${miniChart(stock.history, positive)}
-        <div class="pulse-card-foot"><span>1 month</span><span>${escapeHtml(stock.source)}</span></div>
-      </article>`;
-    }).join("");
-    requestAnimationFrame(() => setPulseIndex(0, "auto"));
-    pulseStatus.textContent = `${stocks.length} current snapshots · Updated ${new Date(payload.generated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})} · Auto-advances every few seconds`;
-    startPulseTimer();
+    pulseStocks = stocks;
+    pulseTrack.innerHTML = [0, 1, 2].map(copy => stocks.map((stock, index) => pulseCardMarkup(stock, index, copy)).join("")).join("");
+    pulseTrack.querySelectorAll(".pulse-card").forEach(card => card.addEventListener("click", () => {
+      if (!pulseDragMoved) openStockDetail(pulseStocks[Number(card.dataset.index)]);
+    }));
+    requestAnimationFrame(() => {
+      const first = pulseTrack.querySelector('.pulse-card[data-copy="1"]');
+      const next = pulseTrack.querySelector('.pulse-card[data-copy="2"]');
+      pulseSetWidth = next.offsetLeft - first.offsetLeft;
+      setPulseIndex(0, "auto");
+      pulseResumeAt = performance.now();
+      if (!pulseFrame) pulseFrame = requestAnimationFrame(animatePulse);
+    });
+    pulseStatus.textContent = `${stocks.length} current snapshots · Updated ${new Date(payload.generated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})} · Continuous live tape · Drag or scroll manually`;
   } else {
     pulseTrack.innerHTML = `<div class="pulse-loading">Market snapshots are temporarily unavailable.</div>`;
     pulseStatus.textContent = "The research desk remains available; this non-critical market rail will retry on the next load.";
   }
 
   const news = payload.news || [];
+  pulseNews = news;
   newsGrid.innerHTML = news.length ? news.map((item, index) => `
     <a class="news-card${index === 0 ? " lead-news" : ""}" href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">
       <span class="news-meta">${escapeHtml(item.publisher)} · ${new Date(item.published_at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span>
@@ -135,23 +231,190 @@ async function loadMarketPulse(symbols = []) {
 
 document.querySelector("#pulse-prev").addEventListener("click", () => {
   setPulseIndex(pulseIndex - 1);
-  startPulseTimer();
+  pausePulseForManual();
 });
 document.querySelector("#pulse-next").addEventListener("click", () => {
   setPulseIndex(pulseIndex + 1);
-  startPulseTimer();
+  pausePulseForManual();
 });
-pulsePause.addEventListener("click", () => {
-  pulsePaused = !pulsePaused;
-  pulsePause.setAttribute("aria-pressed", String(pulsePaused));
-  pulsePause.textContent = pulsePaused ? "Resume" : "Pause";
-  startPulseTimer();
+pulseFormat.addEventListener("change", () => {
+  if (pulseStocks.length) renderMarketPulse({stocks:pulseStocks, news:pulseNews, generated_at:new Date().toISOString()});
 });
-pulseViewport.addEventListener("pointerenter", () => clearInterval(pulseTimer));
-pulseViewport.addEventListener("pointerleave", startPulseTimer);
-pulseViewport.addEventListener("focusin", () => clearInterval(pulseTimer));
-pulseViewport.addEventListener("focusout", startPulseTimer);
+pulseViewport.addEventListener("wheel", () => {
+  pausePulseForManual();
+  requestAnimationFrame(() => { pulsePosition = pulseViewport.scrollLeft; updatePulseFocus(); });
+}, {passive:true});
+pulseViewport.addEventListener("touchstart", pausePulseForManual, {passive:true});
+pulseViewport.addEventListener("scroll", () => {
+  if (performance.now() < pulseResumeAt) {
+    pulsePosition = pulseViewport.scrollLeft;
+    updatePulseFocus();
+  }
+}, {passive:true});
+pulseViewport.addEventListener("keydown", event => {
+  if (event.key === "ArrowLeft") setPulseIndex(pulseIndex - 1);
+  if (event.key === "ArrowRight") setPulseIndex(pulseIndex + 1);
+  if (["ArrowLeft", "ArrowRight"].includes(event.key)) pausePulseForManual();
+});
+pulseViewport.addEventListener("pointerdown", event => {
+  pulseDragging = true;
+  pulseDragMoved = false;
+  pulseDragStartX = event.clientX;
+  pulseDragStartScroll = pulseViewport.scrollLeft;
+  pulseViewport.setPointerCapture(event.pointerId);
+  pausePulseForManual();
+});
+pulseViewport.addEventListener("pointermove", event => {
+  if (!pulseDragging) return;
+  const distance = event.clientX - pulseDragStartX;
+  pulseDragMoved = pulseDragMoved || Math.abs(distance) > 5;
+  pulseViewport.scrollLeft = pulseDragStartScroll - distance;
+  pulsePosition = pulseViewport.scrollLeft;
+  normalizePulsePosition();
+  updatePulseFocus();
+});
+pulseViewport.addEventListener("pointerup", () => {
+  pulseDragging = false;
+  setTimeout(() => { pulseDragMoved = false; }, 0);
+});
+document.querySelector("#detail-close").addEventListener("click", () => stockDetail.close());
+stockDetail.addEventListener("click", event => {
+  if (event.target === stockDetail) stockDetail.close();
+});
 loadMarketPulse();
+
+function compactNumber(value) {
+  return new Intl.NumberFormat("en-US", {notation:"compact", maximumFractionDigits:1}).format(value);
+}
+
+function analyzerChartMarkup(data, type) {
+  const source = data.history || [];
+  const step = Math.max(1, Math.ceil(source.length / 110));
+  const points = source.filter((_, index) => index % step === 0 || index === source.length - 1);
+  const width = 900;
+  const height = 330;
+  const pad = {top:20, right:20, bottom:42, left:66};
+  const low = Math.min(...points.map(point => point.low));
+  const high = Math.max(...points.map(point => point.high));
+  const margin = Math.max((high - low) * .08, high * .002);
+  const min = low - margin;
+  const max = high + margin;
+  const x = index => pad.left + (index / Math.max(points.length - 1, 1)) * (width - pad.left - pad.right);
+  const y = value => pad.top + ((max - value) / Math.max(max - min, .01)) * (height - pad.top - pad.bottom);
+  const gridValues = [max, (max + min) / 2, min];
+  let marks = "";
+  if (type === "candle") {
+    const candleWidth = Math.max(2, Math.min(9, (width - pad.left - pad.right) / points.length * .6));
+    marks = points.map((point, index) => {
+      const up = point.close >= point.open;
+      const bodyTop = y(Math.max(point.open, point.close));
+      const bodyHeight = Math.max(1.5, Math.abs(y(point.open) - y(point.close)));
+      return `<g class="candle ${up ? "up" : "down"}"><line x1="${x(index)}" x2="${x(index)}" y1="${y(point.high)}" y2="${y(point.low)}"/><rect x="${x(index) - candleWidth / 2}" y="${bodyTop}" width="${candleWidth}" height="${bodyHeight}"/></g>`;
+    }).join("");
+  } else {
+    const path = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(2)},${y(point.close).toFixed(2)}`).join(" ");
+    marks = `<path class="analyzer-line" d="${path}"/>`;
+  }
+  const dates = [points[0], points[Math.floor(points.length / 2)], points.at(-1)];
+  return `<div class="analyzer-stage">
+    <svg class="analyzer-svg" viewBox="0 0 ${width} ${height}" tabindex="0" role="img" aria-label="${escapeHtml(data.symbol)} ${type === "candle" ? "candlestick" : "closing price"} chart from ${new Date(points[0].timestamp).toLocaleDateString()} to ${new Date(points.at(-1).timestamp).toLocaleDateString()}">
+      ${gridValues.map(value => `<line class="analyzer-grid" x1="${pad.left}" x2="${width-pad.right}" y1="${y(value)}" y2="${y(value)}"/><text class="analyzer-axis" x="${pad.left-10}" y="${y(value)+4}" text-anchor="end">${money.format(value)}</text>`).join("")}
+      ${marks}
+      ${dates.map((point, index) => `<text class="analyzer-axis" x="${[pad.left,(width+pad.left-pad.right)/2,width-pad.right][index]}" y="${height-12}" text-anchor="${["start","middle","end"][index]}">${new Date(point.timestamp).toLocaleDateString([], {month:"short", day:"numeric", year:"2-digit"})}</text>`).join("")}
+      <line class="analyzer-cursor" x1="0" x2="0" y1="${pad.top}" y2="${height-pad.bottom}" hidden/>
+      <circle class="analyzer-point" cx="0" cy="0" r="4" hidden/>
+      <rect class="analyzer-hit" x="${pad.left}" y="${pad.top}" width="${width-pad.left-pad.right}" height="${height-pad.top-pad.bottom}"/>
+    </svg>
+    <div class="analyzer-tooltip" hidden><strong></strong><span></span><small></small></div>
+  </div>`;
+}
+
+function bindAnalyzerChart(container, data) {
+  const svg = container.querySelector(".analyzer-svg");
+  const tooltip = container.querySelector(".analyzer-tooltip");
+  const cursor = container.querySelector(".analyzer-cursor");
+  const point = container.querySelector(".analyzer-point");
+  const source = data.history;
+  const width = 900;
+  const padLeft = 66;
+  const padRight = 20;
+  const lows = source.map(row => row.low);
+  const highs = source.map(row => row.high);
+  const min = Math.min(...lows) - (Math.max(...highs) - Math.min(...lows)) * .08;
+  const max = Math.max(...highs) + (Math.max(...highs) - Math.min(...lows)) * .08;
+  const show = index => {
+    const safe = Math.max(0, Math.min(source.length - 1, index));
+    const row = source[safe];
+    const x = padLeft + safe / Math.max(source.length - 1, 1) * (width - padLeft - padRight);
+    const y = 20 + (max - row.close) / Math.max(max - min, .01) * (330 - 20 - 42);
+    cursor.setAttribute("x1", x); cursor.setAttribute("x2", x); cursor.hidden = false;
+    point.setAttribute("cx", x); point.setAttribute("cy", y); point.hidden = false;
+    tooltip.querySelector("strong").textContent = money.format(row.close);
+    tooltip.querySelector("span").textContent = `O ${money.format(row.open)} · H ${money.format(row.high)} · L ${money.format(row.low)}`;
+    tooltip.querySelector("small").textContent = `${new Date(row.timestamp).toLocaleDateString()} · Vol ${compactNumber(row.volume)}`;
+    tooltip.style.left = `${x / width * 100}%`; tooltip.style.top = `${y / 330 * 100}%`; tooltip.hidden = false;
+    svg.dataset.index = safe;
+  };
+  svg.addEventListener("pointermove", event => {
+    const bounds = svg.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width * width;
+    show(Math.round(Math.max(0, Math.min(1, (x - padLeft) / (width - padLeft - padRight))) * (source.length - 1)));
+  });
+  svg.addEventListener("pointerleave", () => { tooltip.hidden = true; cursor.hidden = true; point.hidden = true; });
+  svg.addEventListener("keydown", event => {
+    if (!["ArrowLeft","ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    show(Number(svg.dataset.index ?? source.length - 1) + (event.key === "ArrowRight" ? 1 : -1));
+  });
+}
+
+function renderStockAnalysis(data) {
+  const chartType = document.querySelector("#analyzer-chart-type").value;
+  const positive = data.period_return >= 0;
+  analyzerOutput.innerHTML = `
+    <div class="analyzer-summary">
+      <div><span>${escapeHtml(data.symbol)} · ${escapeHtml(data.currency)}</span><strong>${money.format(data.last_price)}</strong><small>As of ${new Date(data.as_of).toLocaleString([], {month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}</small></div>
+      <div class="${positive ? "positive" : "negative"}"><strong>${positive ? "+" : ""}${data.period_return.toFixed(2)}%</strong><span>period return</span></div>
+    </div>
+    <div class="analyzer-metrics">
+      <div><span>Latest move</span><strong class="${data.change_pct >= 0 ? "positive" : "negative"}">${data.change_pct >= 0 ? "+" : ""}${data.change_pct.toFixed(2)}%</strong></div>
+      <div><span>Period high</span><strong>${money.format(data.period_high)}</strong></div>
+      <div><span>Period low</span><strong>${money.format(data.period_low)}</strong></div>
+      <div><span>Realized volatility</span><strong>${data.volatility.toFixed(1)}%</strong></div>
+      <div><span>Average volume</span><strong>${compactNumber(data.average_volume)}</strong></div>
+    </div>
+    ${analyzerChartMarkup(data, chartType)}
+    <p class="analyzer-source">${escapeHtml(data.source)} · ${data.interval === "1wk" ? "Weekly" : "Daily"} OHLCV history · ${new Date(data.history[0].timestamp).toLocaleDateString()}–${new Date(data.history.at(-1).timestamp).toLocaleDateString()}</p>`;
+  bindAnalyzerChart(analyzerOutput, data);
+}
+
+analyzerForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const symbol = document.querySelector("#analyzer-symbol").value.trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9.-]{0,9}$/.test(symbol)) {
+    analyzerOutput.innerHTML = `<div class="analyzer-empty">Enter a valid ticker symbol.</div>`;
+    return;
+  }
+  const period = document.querySelector("#analyzer-period").value;
+  const interval = document.querySelector("#analyzer-interval").value;
+  document.querySelector("#analyzer-submit").disabled = true;
+  analyzerOutput.innerHTML = `<div class="analyzer-empty">Loading validated OHLCV history for ${escapeHtml(symbol)}…</div>`;
+  try {
+    const response = await fetch(`/api/stock-analyzer?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}&interval=${encodeURIComponent(interval)}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+    renderStockAnalysis(await response.json());
+  } catch (error) {
+    analyzerOutput.innerHTML = `<div class="analyzer-empty">Stock analysis unavailable: ${escapeHtml(error.message)}</div>`;
+  } finally {
+    document.querySelector("#analyzer-submit").disabled = false;
+  }
+});
+document.querySelector("#analyzer-chart-type").addEventListener("change", () => {
+  if (analyzerOutput.querySelector(".analyzer-svg")) analyzerForm.requestSubmit();
+});
 
 function addDebate(message) {
   const item = document.createElement("article");
@@ -487,8 +750,9 @@ let returnFocus = null;
 
 const allTourSteps = [
   {selector:"#analyze-form", kicker:"Start here", title:"Choose what to research", copy:"Enter up to five ticker symbols and choose 1–30 rounds. Each round tests a different time window and risk lens before the stocks are ranked."},
-  {selector:".pulse-viewport", kicker:"Scan the market", title:"Live market pulse", copy:"These source-labeled one-month charts advance automatically and enlarge the active security. Pause the rail or use the arrow controls whenever you want to inspect one stock."},
-  {selector:".news-grid", kicker:"Track new information", title:"Latest market coverage", copy:"This separate feed shows timestamped headlines and their publishers. Each story opens at its Yahoo Finance destination so you can evaluate the original coverage."},
+  {selector:".pulse-viewport", kicker:"Scan the market", title:"Continuous market pulse", copy:"The tape moves continuously and enlarges the security nearest the center. Drag or scroll it manually; after five idle seconds it accelerates smoothly back to cruising speed. Select any card for detail."},
+  {selector:".stock-analyzer", kicker:"Inspect the history", title:"Stock Analyzer", copy:"Enter a ticker and choose the period, interval, and line or candlestick view. The chart exposes exact OHLCV observations, performance, volatility, range, and source dates."},
+  {selector:".news-grid", kicker:"Track new information", title:"Latest market coverage", copy:"This separate feed shows timestamped headlines and publishers. Cached results and an independent RSS fallback keep coverage available when one news endpoint is offline."},
   {selector:".process-card", kicker:"Follow the reasoning", title:"Live agent room", copy:"This feed shows each step in order. Bull looks for upside, Bear challenges it, Risk applies safeguards, and the Portfolio Manager makes the final call."},
   {selector:".output-card", kicker:"Read the decision", title:"PM scorecard", copy:"This is the concise outcome. Direction shows the current signal, while the score measures strength—not a guaranteed return."},
   {selector:".metrics", kicker:"Understand the numbers", title:"Three useful reference points", copy:"Last close is the latest validated price. Daily move is the most recent change. Confidence is deliberately reduced when volatility or evidence risk is high."},
