@@ -68,7 +68,7 @@ class MarketDataProvider(Protocol):
 
 
 class YahooMarketData:
-    def __init__(self, timeout: float = 7.0, cache_ttl: float = 300.0) -> None:
+    def __init__(self, timeout: float = 7.0, cache_ttl: float = 55.0) -> None:
         self.timeout = timeout
         self.cache_ttl = cache_ttl
         self._cache: dict[str, tuple[float, MarketSnapshot]] = {}
@@ -170,7 +170,7 @@ class ResilientMarketData:
     def __init__(
         self,
         providers: tuple[MarketDataProvider, ...] | None = None,
-        cache_ttl: float = 300.0,
+        cache_ttl: float = 55.0,
     ) -> None:
         self.providers = providers or (YahooMarketData(), NasdaqMarketData())
         self.cache_ttl = cache_ttl
@@ -255,25 +255,14 @@ def fetch_yahoo_news(query: str = "stock market", limit: int = 6, timeout: float
                     published = node.findtext("pubDate")
                     source = node.findtext("source") or "Market news"
                     if title and link and published:
-                        media = node.find("{http://search.yahoo.com/mrss/}content")
-                        if media is None:
-                            media = node.find("{http://search.yahoo.com/mrss/}thumbnail")
-                        enclosure = node.find("enclosure")
-                        image_url = media.get("url") if media is not None else None
-                        if not image_url and enclosure is not None and (
-                            enclosure.get("type") or ""
-                        ).startswith("image/"):
-                            image_url = enclosure.get("url")
-                        if not image_url:
-                            description = node.findtext("description") or ""
-                            match = re.search(r"""<img[^>]+src=["']([^"']+)""", description, re.IGNORECASE)
-                            image_url = match.group(1) if match else None
                         items.append({
                             "title": title,
                             "publisher": source,
                             "published_at": parsedate_to_datetime(published).astimezone(timezone.utc),
                             "url": link,
-                            "image_url": image_url,
+                            # RSS artwork is frequently a publisher logo or unrelated
+                            # recommendation. Only first-party API thumbnails are shown.
+                            "image_url": None,
                         })
                 if items:
                     break

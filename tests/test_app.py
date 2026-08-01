@@ -36,9 +36,11 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260801a" in page.text
-    assert "script.js?v=20260801a" in page.text
+    assert "style.css?v=20260801b" in page.text
+    assert "script.js?v=20260801b" in page.text
     assert "How to use Northstar" in page.text
+    assert "Turn a ticker into a testable investment case" in page.text
+    assert "Live portfolio" in page.text
     assert "Research systems operational" not in page.text
 
 
@@ -46,9 +48,9 @@ def test_all_news_page_is_available() -> None:
     page = TestClient(app).get("/news.html")
     assert page.status_code == 200
     assert "Market news" in page.text
-    assert "news.js?v=20260801a" in page.text
+    assert "news.js?v=20260801b" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260801a" in page.text
+    assert "site-shell.js?v=20260801b" in page.text
 
 
 def test_beginner_guide_is_publicly_available() -> None:
@@ -58,7 +60,7 @@ def test_beginner_guide_is_publicly_available() -> None:
     assert "What is a stock ticker?" in page.text
     assert "Signal score" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260801a" in page.text
+    assert "site-shell.js?v=20260801b" in page.text
 
 
 def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
@@ -67,7 +69,7 @@ def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
     page = client.get("/login.html")
     assert page.status_code == 200
     assert "Create account" in page.text
-    assert "auth.js?v=20260801a" in page.text
+    assert "auth.js?v=20260801b" in page.text
 
     registration = client.post("/api/auth/register", json={
         "display_name": "Test Investor",
@@ -88,6 +90,37 @@ def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
         "email": "investor@example.com",
         "password": "a-secure-password",
     }).status_code == 200
+
+
+def test_live_portfolio_requires_login_and_persists_holdings(tmp_path) -> None:
+    previous_store = main.auth_store
+    previous_provider = main.engine.provider
+    main.auth_store = AuthStore(tmp_path / "portfolio-test.db")
+    main.engine.provider = StubProvider()
+    client = TestClient(app)
+    try:
+        assert client.get("/api/portfolio").status_code == 401
+        assert client.post("/api/auth/register", json={
+            "display_name": "Portfolio Owner",
+            "email": "portfolio@example.com",
+            "password": "a-secure-password",
+        }).status_code == 201
+        saved = client.post("/api/portfolio/holdings", json={
+            "symbol": "test",
+            "shares": 2,
+            "average_cost": 100,
+        })
+        assert saved.status_code == 200
+        body = saved.json()
+        assert body["source_status"] == "live"
+        assert body["holdings"][0]["symbol"] == "TEST"
+        assert body["holdings"][0]["market_value"] == 244
+        assert body["total_return_value"] == 44
+        assert client.get("/api/portfolio").json()["holdings"][0]["shares"] == 2
+        assert client.delete("/api/portfolio/holdings/TEST").json()["holdings"] == []
+    finally:
+        main.auth_store = previous_store
+        main.engine.provider = previous_provider
 
 
 def test_request_validation() -> None:

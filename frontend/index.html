@@ -18,14 +18,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260801a">
+  <link rel="stylesheet" href="style.css?v=20260801b">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Northstar home"><span class="brand-mark">N</span><span>Northstar</span></a>
     <nav class="primary-nav" aria-label="Primary navigation">
       <a href="/" aria-current="page">Home</a>
-      <a href="#workspace">Research</a>
+      <a href="#research-overview">Research</a>
       <a href="/news.html">News</a>
       <a href="/beginners.html">Learn</a>
     </nav>
@@ -72,6 +72,19 @@
       </ol>
     </section>
 
+    <section id="research-overview" class="research-overview" aria-labelledby="research-overview-title">
+      <div class="research-overview-intro">
+        <p class="kicker">What research means here</p>
+        <h2 id="research-overview-title">Turn a ticker into a testable investment case.</h2>
+        <p>Northstar does not predict a guaranteed return. It organizes current price evidence into a transparent argument you can inspect, challenge, and verify.</p>
+      </div>
+      <div class="research-pillars">
+        <article><span>01</span><strong>Frame the question</strong><p>Choose the securities and the number of time windows worth testing.</p></article>
+        <article><span>02</span><strong>Pressure-test both sides</strong><p>Bull and Bear interpret the same evidence; Risk names thresholds that can invalidate either case.</p></article>
+        <article><span>03</span><strong>Read the verdict carefully</strong><p>The PM ranks evidence strength, confidence, source dates, and known gaps—not a promised outcome.</p></article>
+      </div>
+    </section>
+
     <section id="market-pulse" class="market-pulse" aria-labelledby="pulse-title">
       <div class="pulse-heading">
         <div>
@@ -110,6 +123,23 @@
         </form>
         <div id="analyzer-output" class="analyzer-output" aria-live="polite">
           <div class="analyzer-empty">Choose a ticker, period, interval, and chart style to inspect its market history.</div>
+        </div>
+      </section>
+
+      <section id="portfolio" class="portfolio" aria-labelledby="portfolio-title">
+        <div class="portfolio-heading">
+          <div><p class="kicker">Personal watchbook</p><h2 id="portfolio-title">Live portfolio</h2></div>
+          <span id="portfolio-refresh">Latest validated values refresh every minute</span>
+        </div>
+        <div id="portfolio-gate" class="portfolio-gate">Log in to save holdings and follow their latest value across visits. <a href="/login.html">Log in or create an account →</a></div>
+        <div id="portfolio-workspace" hidden>
+          <form id="portfolio-form" class="portfolio-form">
+            <label>Ticker<input id="portfolio-symbol" maxlength="10" placeholder="NVDA" required></label>
+            <label>Shares<input id="portfolio-shares" type="number" min="0.0001" max="1000000" step="any" placeholder="10" required></label>
+            <label>Average cost <small>optional</small><input id="portfolio-cost" type="number" min="0.01" step="any" placeholder="185.00"></label>
+            <button type="submit">Add or update →</button>
+          </form>
+          <div id="portfolio-output" class="portfolio-output" aria-live="polite"></div>
         </div>
       </section>
 
@@ -177,7 +207,7 @@
       </div>
     </section>
   </div>
-  <script src="site-shell.js?v=20260801a"></script>
-  <script src="script.js?v=20260801a"></script>
+  <script src="site-shell.js?v=20260801b"></script>
+  <script src="script.js?v=20260801b"></script>
 </body>
 </html>

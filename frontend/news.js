@@ -32,6 +32,10 @@ fetch("/api/market-pulse")
   .then(payload => {
     const news = payload.news || [];
     grid.innerHTML = news.length ? news.map(card).join("") : `<div class="news-loading">No current headlines are available.</div>`;
+    const tail = [...grid.querySelectorAll(".news-card")].slice(2);
+    const remainder = tail.length % 3;
+    if (remainder === 1) tail.at(-1)?.classList.add("news-fill-full");
+    if (remainder === 2) tail.slice(-2).forEach(article => article.classList.add("news-fill-half"));
     grid.querySelectorAll(".news-visual img").forEach(image => image.addEventListener("error", () => {
       const article = image.closest(".news-card");
       image.parentElement.remove();

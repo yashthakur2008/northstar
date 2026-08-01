@@ -22,6 +22,10 @@ const stockDetail = document.querySelector("#stock-detail");
 const detailContent = document.querySelector("#detail-content");
 const analyzerForm = document.querySelector("#analyzer-form");
 const analyzerOutput = document.querySelector("#analyzer-output");
+const portfolioGate = document.querySelector("#portfolio-gate");
+const portfolioWorkspace = document.querySelector("#portfolio-workspace");
+const portfolioForm = document.querySelector("#portfolio-form");
+const portfolioOutput = document.querySelector("#portfolio-output");
 let pulseIndex = 0;
 let pulseStocks = [];
 let pulseNews = [];
@@ -219,6 +223,10 @@ function newsCardMarkup(item, index) {
 function renderNewsCards() {
   const visible = pulseNews.slice(0, visibleNewsCount);
   newsGrid.innerHTML = visible.length ? visible.map(newsCardMarkup).join("") : `<div class="news-loading">Headlines are temporarily unavailable. Stock updates remain live.</div>`;
+  const tail = [...newsGrid.querySelectorAll(".news-card")].slice(2);
+  const remainder = tail.length % 3;
+  if (remainder === 1) tail.at(-1)?.classList.add("news-fill-full");
+  if (remainder === 2) tail.slice(-2).forEach(card => card.classList.add("news-fill-half"));
   newsGrid.querySelectorAll(".news-visual img").forEach(image => image.addEventListener("error", () => {
     const card = image.closest(".news-card");
     image.parentElement.remove();
@@ -299,7 +307,7 @@ newsMore.addEventListener("click", () => {
     window.location.href = "/news.html";
     return;
   }
-  visibleNewsCount = Math.min(pulseNews.length, visibleNewsCount + 2);
+  visibleNewsCount = Math.min(pulseNews.length, visibleNewsCount + 3);
   renderNewsCards();
 });
 
@@ -321,7 +329,7 @@ function analyzerChartMarkup(data, type) {
   const max = high + margin;
   const x = index => pad.left + (index / Math.max(points.length - 1, 1)) * (width - pad.left - pad.right);
   const y = value => pad.top + ((max - value) / Math.max(max - min, .01)) * (height - pad.top - pad.bottom);
-  const gridValues = [max, (max + min) / 2, min];
+  const gridValues = Array.from({length:6}, (_, index) => max - (max - min) * index / 5);
   let marks = "";
   if (type === "candle") {
     const candleWidth = Math.max(2, Math.min(9, (width - pad.left - pad.right) / points.length * .6));
@@ -335,12 +343,14 @@ function analyzerChartMarkup(data, type) {
     const path = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(2)},${y(point.close).toFixed(2)}`).join(" ");
     marks = `<path class="analyzer-line" d="${path}"/>`;
   }
-  const dates = [points[0], points[Math.floor(points.length / 2)], points.at(-1)];
+  const dateIndexes = [0, .25, .5, .75, 1].map(ratio => Math.round((points.length - 1) * ratio));
+  const dates = dateIndexes.map(index => points[index]);
   return `<div class="analyzer-stage">
     <svg class="analyzer-svg" viewBox="0 0 ${width} ${height}" tabindex="0" role="img" aria-label="${escapeHtml(data.symbol)} ${type === "candle" ? "candlestick" : "closing price"} chart from ${new Date(points[0].timestamp).toLocaleDateString()} to ${new Date(points.at(-1).timestamp).toLocaleDateString()}">
       ${gridValues.map(value => `<line class="analyzer-grid" x1="${pad.left}" x2="${width-pad.right}" y1="${y(value)}" y2="${y(value)}"/><text class="analyzer-axis" x="${pad.left-10}" y="${y(value)+4}" text-anchor="end">${money.format(value)}</text>`).join("")}
+      ${dateIndexes.map(index => `<line class="analyzer-grid analyzer-grid-vertical" x1="${x(index)}" x2="${x(index)}" y1="${pad.top}" y2="${height-pad.bottom}"/>`).join("")}
       ${marks}
-      ${dates.map((point, index) => `<text class="analyzer-axis" x="${[pad.left,(width+pad.left-pad.right)/2,width-pad.right][index]}" y="${height-12}" text-anchor="${["start","middle","end"][index]}">${new Date(point.timestamp).toLocaleDateString([], {month:"short", day:"numeric", year:"2-digit"})}</text>`).join("")}
+      ${dates.map((point, index) => `<text class="analyzer-axis" x="${x(dateIndexes[index])}" y="${height-12}" text-anchor="${index === 0 ? "start" : index === dates.length - 1 ? "end" : "middle"}">${new Date(point.timestamp).toLocaleDateString([], {month:"short", day:"numeric", year:"2-digit"})}</text>`).join("")}
       <line class="analyzer-cursor" x1="0" x2="0" y1="${pad.top}" y2="${height-pad.bottom}" hidden/>
       <circle class="analyzer-point" cx="0" cy="0" r="4" hidden/>
       <rect class="analyzer-hit" x="${pad.left}" y="${pad.top}" width="${width-pad.left-pad.right}" height="${height-pad.top-pad.bottom}"/>
@@ -445,6 +455,91 @@ analyzerForm.addEventListener("submit", async event => {
 document.querySelector("#analyzer-chart-type").addEventListener("change", () => {
   if (lastAnalyzerData) renderStockAnalysis(lastAnalyzerData);
 });
+
+function signedMoney(value) {
+  const number = Number(value) || 0;
+  return `${number >= 0 ? "+" : "−"}${money.format(Math.abs(number))}`;
+}
+
+function renderPortfolio(data) {
+  const rows = data.holdings || [];
+  const status = document.querySelector("#portfolio-refresh");
+  status.textContent = `${data.source_status === "live" ? "Live provider refresh" : "Partial provider refresh"} · ${new Date(data.generated_at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}`;
+  if (!rows.length) {
+    portfolioOutput.innerHTML = `<div class="portfolio-empty">Your portfolio is ready. Add a ticker, share count, and optional average cost above.</div>`;
+    return;
+  }
+  portfolioOutput.innerHTML = `
+    <div class="portfolio-summary">
+      <div><span>Current value</span><strong>${money.format(data.total_value)}</strong></div>
+      <div><span>Latest session</span><strong class="${data.day_change_value >= 0 ? "positive" : "negative"}">${signedMoney(data.day_change_value)}</strong></div>
+      <div><span>Return vs. entered cost</span><strong>${data.total_return_value == null ? "Add cost basis" : signedMoney(data.total_return_value)}</strong></div>
+    </div>
+    <div class="portfolio-list">
+      ${rows.map(row => `<article>
+        <button class="portfolio-symbol" type="button" data-analyze="${escapeHtml(row.symbol)}"><strong>${escapeHtml(row.symbol)}</strong><span>${row.shares.toLocaleString()} shares</span></button>
+        <div><span>Latest</span><strong>${money.format(row.last_price)}</strong></div>
+        <div><span>Market value</span><strong>${money.format(row.market_value)}</strong></div>
+        <div><span>Session</span><strong class="${row.day_change_value >= 0 ? "positive" : "negative"}">${signedMoney(row.day_change_value)} · ${row.day_change_pct >= 0 ? "+" : ""}${row.day_change_pct.toFixed(2)}%</strong></div>
+        <button class="portfolio-remove" type="button" data-remove="${escapeHtml(row.symbol)}" aria-label="Remove ${escapeHtml(row.symbol)}">Remove</button>
+      </article>`).join("")}
+    </div>`;
+  portfolioOutput.querySelectorAll("[data-analyze]").forEach(button => button.addEventListener("click", () => {
+    document.querySelector("#analyzer-symbol").value = button.dataset.analyze;
+    document.querySelector("#stock-analyzer").scrollIntoView({behavior:"smooth", block:"start"});
+    analyzerForm.requestSubmit();
+  }));
+  portfolioOutput.querySelectorAll("[data-remove]").forEach(button => button.addEventListener("click", async () => {
+    button.disabled = true;
+    const response = await fetch(`/api/portfolio/holdings/${encodeURIComponent(button.dataset.remove)}`, {method:"DELETE"});
+    if (response.ok) renderPortfolio(await response.json());
+  }));
+}
+
+async function loadPortfolio() {
+  const response = await fetch("/api/portfolio");
+  if (response.status === 401) {
+    portfolioGate.hidden = false;
+    portfolioWorkspace.hidden = true;
+    return;
+  }
+  if (!response.ok) return;
+  portfolioGate.hidden = true;
+  portfolioWorkspace.hidden = false;
+  renderPortfolio(await response.json());
+}
+
+portfolioForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const payload = {
+    symbol: document.querySelector("#portfolio-symbol").value.trim().toUpperCase(),
+    shares: Number(document.querySelector("#portfolio-shares").value),
+    average_cost: Number(document.querySelector("#portfolio-cost").value) || null,
+  };
+  const button = portfolioForm.querySelector("button");
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/portfolio/holdings", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Unable to save this holding.");
+    renderPortfolio(result);
+    portfolioForm.reset();
+  } catch (error) {
+    portfolioOutput.innerHTML = `<div class="portfolio-empty">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+});
+loadPortfolio();
+setInterval(() => {
+  loadMarketPulse();
+  loadPortfolio();
+  if (lastAnalyzerData) analyzerForm.requestSubmit();
+}, 60000);
 
 function addDebate(message) {
   const item = document.createElement("article");

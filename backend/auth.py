@@ -44,6 +44,16 @@ class AuthStore:
                     expires_at INTEGER NOT NULL,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS portfolio_holdings (
+                    user_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    shares REAL NOT NULL CHECK (shares > 0),
+                    average_cost REAL,
+                    updated_at INTEGER NOT NULL,
+                    PRIMARY KEY (user_id, symbol),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
                 """
             )
 
@@ -141,4 +151,36 @@ class AuthStore:
             connection.execute(
                 "DELETE FROM sessions WHERE token_hash = ?",
                 (self._token_hash(token),),
+            )
+
+    def portfolio_holdings(self, user_id: int) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT symbol, shares, average_cost
+                FROM portfolio_holdings WHERE user_id = ? ORDER BY updated_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_holding(self, user_id: int, symbol: str, shares: float, average_cost: float | None) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO portfolio_holdings (user_id, symbol, shares, average_cost, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, symbol) DO UPDATE SET
+                    shares = excluded.shares,
+                    average_cost = excluded.average_cost,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, symbol, shares, average_cost, int(time.time())),
+            )
+
+    def delete_holding(self, user_id: int, symbol: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM portfolio_holdings WHERE user_id = ? AND symbol = ?",
+                (user_id, symbol),
             )

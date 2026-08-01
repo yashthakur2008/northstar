@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from auth import AuthStore, SESSION_SECONDS
 from engine import AnalysisEngine
-from models import AnalysisReport, AnalyzeRequest, AnalyzerPoint, MarketPulse, NewsItem, PricePoint, StockAnalysis, StockPulse
+from models import AnalysisReport, AnalyzeRequest, AnalyzerPoint, MarketPulse, NewsItem, Portfolio, PortfolioHolding, PortfolioHoldingInput, PricePoint, StockAnalysis, StockPulse
 from providers import MarketDataError, fetch_resilient_analysis, fetch_yahoo_news
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -93,6 +93,62 @@ def set_session_cookie(response: Response, request: Request, token: str) -> None
         path="/",
     )
 
+def require_user(session_token: str | None) -> dict:
+    user = auth_store.user_for_session(session_token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Log in to manage a live portfolio.")
+    return user
+
+
+async def build_portfolio(user_id: int) -> Portfolio:
+    saved = auth_store.portfolio_holdings(user_id)
+    if not saved:
+        return Portfolio(
+            holdings=[],
+            total_value=0,
+            day_change_value=0,
+            total_return_value=None,
+            generated_at=datetime.now(timezone.utc),
+            source_status="live",
+        )
+    snapshots = await asyncio.gather(
+        *(engine.provider.fetch(row["symbol"]) for row in saved),
+        return_exceptions=True,
+    )
+    holdings: list[PortfolioHolding] = []
+    failures = 0
+    for saved_row, snapshot in zip(saved, snapshots):
+        if isinstance(snapshot, Exception):
+            failures += 1
+            continue
+        shares = float(saved_row["shares"])
+        average_cost = saved_row["average_cost"]
+        market_value = shares * snapshot.last
+        previous_close = snapshot.prices[-2] if len(snapshot.prices) > 1 else snapshot.last
+        total_return_value = None if average_cost is None else market_value - shares * float(average_cost)
+        holdings.append(PortfolioHolding(
+            symbol=snapshot.symbol,
+            shares=shares,
+            average_cost=average_cost,
+            last_price=round(snapshot.last, 2),
+            market_value=round(market_value, 2),
+            day_change_pct=round(snapshot.change_pct, 2),
+            day_change_value=round(shares * (snapshot.last - previous_close), 2),
+            total_return_pct=None if average_cost is None else round((snapshot.last / float(average_cost) - 1) * 100, 2),
+            total_return_value=None if total_return_value is None else round(total_return_value, 2),
+            as_of=snapshot.as_of,
+            source=snapshot.source,
+        ))
+    known_returns = [row.total_return_value for row in holdings if row.total_return_value is not None]
+    return Portfolio(
+        holdings=holdings,
+        total_value=round(sum(row.market_value for row in holdings), 2),
+        day_change_value=round(sum(row.day_change_value for row in holdings), 2),
+        total_return_value=round(sum(known_returns), 2) if known_returns else None,
+        generated_at=datetime.now(timezone.utc),
+        source_status="unavailable" if not holdings else "partial" if failures else "live",
+    )
+
 
 @app.post("/api/auth/register", status_code=201)
 async def register(payload: RegisterRequest, request: Request, response: Response) -> dict:
@@ -128,6 +184,37 @@ async def logout(response: Response, northstar_session: str | None = Cookie(defa
     auth_store.delete_session(northstar_session)
     response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax")
     return {"authenticated": False}
+
+
+@app.get("/api/portfolio", response_model=Portfolio)
+async def get_portfolio(northstar_session: str | None = Cookie(default=None)) -> Portfolio:
+    return await build_portfolio(require_user(northstar_session)["id"])
+
+
+@app.post("/api/portfolio/holdings", response_model=Portfolio)
+async def save_portfolio_holding(
+    payload: PortfolioHoldingInput,
+    northstar_session: str | None = Cookie(default=None),
+) -> Portfolio:
+    user = require_user(northstar_session)
+    existing = auth_store.portfolio_holdings(user["id"])
+    if payload.symbol not in {row["symbol"] for row in existing} and len(existing) >= 20:
+        raise HTTPException(status_code=422, detail="A portfolio can contain up to 20 holdings.")
+    auth_store.upsert_holding(user["id"], payload.symbol, payload.shares, payload.average_cost)
+    return await build_portfolio(user["id"])
+
+
+@app.delete("/api/portfolio/holdings/{symbol}", response_model=Portfolio)
+async def remove_portfolio_holding(
+    symbol: str,
+    northstar_session: str | None = Cookie(default=None),
+) -> Portfolio:
+    user = require_user(northstar_session)
+    normalized = symbol.strip().upper()
+    if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", normalized):
+        raise HTTPException(status_code=422, detail="Enter a valid ticker symbol.")
+    auth_store.delete_holding(user["id"], normalized)
+    return await build_portfolio(user["id"])
 
 
 @app.get("/api/market-pulse", response_model=MarketPulse)

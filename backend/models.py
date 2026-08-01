@@ -131,3 +131,40 @@ class StockAnalysis(BaseModel):
     as_of: datetime
     source: str
     history: list[AnalyzerPoint]
+
+
+class PortfolioHoldingInput(BaseModel):
+    symbol: str
+    shares: float = Field(gt=0, le=1_000_000)
+    average_cost: float | None = Field(default=None, gt=0)
+
+    @field_validator("symbol")
+    @classmethod
+    def normalize_symbol(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not TICKER_RE.fullmatch(normalized):
+            raise ValueError("Enter a valid ticker symbol.")
+        return normalized
+
+
+class PortfolioHolding(BaseModel):
+    symbol: str
+    shares: float
+    average_cost: float | None = None
+    last_price: float
+    market_value: float
+    day_change_pct: float
+    day_change_value: float
+    total_return_pct: float | None = None
+    total_return_value: float | None = None
+    as_of: datetime
+    source: str
+
+
+class Portfolio(BaseModel):
+    holdings: list[PortfolioHolding]
+    total_value: float
+    day_change_value: float
+    total_return_value: float | None = None
+    generated_at: datetime
+    source_status: Literal["live", "partial", "unavailable"]
