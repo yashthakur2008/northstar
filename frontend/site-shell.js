@@ -1,4 +1,5 @@
 const themeToggle = document.querySelector("#theme-toggle");
+const authLink = document.querySelector("[data-auth-link]");
 
 function applySiteTheme(theme, persist = true) {
   const dark = theme === "dark";
@@ -21,3 +22,16 @@ applySiteTheme(document.documentElement.dataset.theme || "light", false);
 themeToggle?.addEventListener("click", () => {
   applySiteTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 });
+
+if (authLink) {
+  fetch("/api/auth/me", { credentials: "same-origin" })
+    .then((response) => response.ok ? response.json() : null)
+    .then((session) => {
+      if (session?.authenticated) {
+        authLink.textContent = session.user.display_name;
+        authLink.classList.add("is-authenticated");
+        authLink.setAttribute("aria-label", `Open account for ${session.user.display_name}`);
+      }
+    })
+    .catch(() => {});
+}

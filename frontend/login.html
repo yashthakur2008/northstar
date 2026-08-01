@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Sign in to or create a Northstar account.">
+  <title>Account · Northstar</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("northstar-theme");
+        const theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch (_) {}
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20260801a">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northstar home"><span class="brand-mark">N</span><span>Northstar</span></a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="/">Home</a><a href="/#workspace">Research</a><a href="/news.html">News</a><a href="/beginners.html">Learn</a>
+    </nav>
+    <div class="topbar-actions">
+      <a class="help-button" href="/?tour=1"><span aria-hidden="true">?</span> Help</a>
+      <a class="account-link" data-auth-link href="/login.html" aria-current="page">Log in</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false">
+        <span class="theme-icon" aria-hidden="true">☾</span><span class="theme-label">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="auth-page">
+    <section class="auth-intro">
+      <p class="kicker">Northstar account</p>
+      <h1>Your research desk, ready when you are.</h1>
+      <p>Sign in securely or create an account. Passwords are salted and hashed, and your browser receives an HTTP-only session cookie.</p>
+      <ul><li>One account across desktop and mobile</li><li>Seven-day secure sessions</li><li>No password is stored in readable form</li></ul>
+    </section>
+
+    <section class="auth-card" aria-labelledby="auth-title">
+      <div id="auth-gateway">
+        <div class="auth-tabs" role="tablist" aria-label="Account options">
+          <button type="button" role="tab" data-auth-tab="login" aria-selected="true">Sign in</button>
+          <button type="button" role="tab" data-auth-tab="register" aria-selected="false">Create account</button>
+        </div>
+        <form class="auth-form" data-auth-form="login">
+          <div><h2 id="auth-title">Welcome back</h2><p>Continue to the Northstar research desk.</p></div>
+          <label>Email address<input name="email" type="email" autocomplete="email" required></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+          <button type="submit">Sign in <span>→</span></button>
+        </form>
+        <form class="auth-form" data-auth-form="register" hidden>
+          <div><h2>Create your account</h2><p>Use at least 10 characters for your password.</p></div>
+          <label>Name<input name="display_name" autocomplete="name" minlength="2" maxlength="50" required></label>
+          <label>Email address<input name="email" type="email" autocomplete="email" required></label>
+          <label>Password<input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+          <button type="submit">Create account <span>→</span></button>
+        </form>
+      </div>
+      <div id="account-panel" class="account-panel" hidden>
+        <span class="account-avatar" aria-hidden="true">N</span>
+        <p class="kicker">Signed in</p>
+        <h2 id="account-name"></h2>
+        <p id="account-email"></p>
+        <div><a href="/">Open research desk</a><button id="logout-button" type="button">Sign out</button></div>
+      </div>
+      <p id="auth-status" class="auth-status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <script src="site-shell.js?v=20260801a"></script>
+  <script src="auth.js?v=20260801a"></script>
+</body>
+</html>

@@ -12,11 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Cookie, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
+from auth import AuthStore, SESSION_SECONDS
 from engine import AnalysisEngine
 from models import AnalysisReport, AnalyzeRequest, AnalyzerPoint, MarketPulse, NewsItem, PricePoint, StockAnalysis, StockPulse
 from providers import MarketDataError, fetch_resilient_analysis, fetch_yahoo_news
@@ -24,6 +26,8 @@ from providers import MarketDataError, fetch_resilient_analysis, fetch_yahoo_new
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 engine = AnalysisEngine()
+auth_store = AuthStore(Path(os.getenv("AUTH_DB_PATH", BASE_DIR / "northstar_auth.db")))
+SESSION_COOKIE = "northstar_session"
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -42,8 +46,8 @@ if allowed_origins:
 async def prevent_mixed_frontend_versions(request, call_next):
     response = await call_next(request)
     if request.url.path in {
-        "/", "/index.html", "/news.html", "/beginners.html",
-        "/style.css", "/script.js", "/news.js", "/site-shell.js",
+        "/", "/index.html", "/news.html", "/beginners.html", "/login.html",
+        "/style.css", "/script.js", "/news.js", "/site-shell.js", "/auth.js",
     }:
         response.headers["Cache-Control"] = "no-store, max-age=0"
         response.headers["Pragma"] = "no-cache"
@@ -53,6 +57,77 @@ async def prevent_mixed_frontend_versions(request, call_next):
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "version": app.version, "market_data": "Yahoo Finance with Nasdaq fallback"}
+
+
+class RegisterRequest(BaseModel):
+    display_name: str = Field(min_length=2, max_length=50)
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=10, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=1, max_length=128)
+
+
+def normalize_email(email: str) -> str:
+    normalized = email.strip().lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
+        raise HTTPException(status_code=422, detail="Enter a valid email address.")
+    return normalized
+
+
+def set_session_cookie(response: Response, request: Request, token: str) -> None:
+    secure_cookie = (
+        request.url.scheme == "https"
+        or bool(os.getenv("RENDER"))
+        or os.getenv("COOKIE_SECURE", "").lower() == "true"
+    )
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_SECONDS,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+
+
+@app.post("/api/auth/register", status_code=201)
+async def register(payload: RegisterRequest, request: Request, response: Response) -> dict:
+    email = normalize_email(payload.email)
+    display_name = " ".join(payload.display_name.strip().split())
+    try:
+        user = auth_store.create_user(email, display_name, payload.password)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail="An account with this email already exists.") from error
+    token = auth_store.create_session(user["id"])
+    set_session_cookie(response, request, token)
+    return {"authenticated": True, "user": user}
+
+
+@app.post("/api/auth/login")
+async def login(payload: LoginRequest, request: Request, response: Response) -> dict:
+    user = auth_store.authenticate(normalize_email(payload.email), payload.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Email or password is incorrect.")
+    token = auth_store.create_session(user["id"])
+    set_session_cookie(response, request, token)
+    return {"authenticated": True, "user": user}
+
+
+@app.get("/api/auth/me")
+async def current_user(northstar_session: str | None = Cookie(default=None)) -> dict:
+    user = auth_store.user_for_session(northstar_session)
+    return {"authenticated": user is not None, "user": user}
+
+
+@app.post("/api/auth/logout")
+async def logout(response: Response, northstar_session: str | None = Cookie(default=None)) -> dict:
+    auth_store.delete_session(northstar_session)
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax")
+    return {"authenticated": False}
 
 
 @app.get("/api/market-pulse", response_model=MarketPulse)

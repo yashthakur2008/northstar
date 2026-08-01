@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 import main
+from auth import AuthStore
 from engine import AnalysisEngine
 from main import app
 from models import AnalyzeRequest
@@ -35,8 +36,8 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260731h" in page.text
-    assert "script.js?v=20260731g" in page.text
+    assert "style.css?v=20260801a" in page.text
+    assert "script.js?v=20260801a" in page.text
     assert "How to use Northstar" in page.text
     assert "Research systems operational" not in page.text
 
@@ -45,9 +46,9 @@ def test_all_news_page_is_available() -> None:
     page = TestClient(app).get("/news.html")
     assert page.status_code == 200
     assert "Market news" in page.text
-    assert "news.js?v=20260731g" in page.text
+    assert "news.js?v=20260801a" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260731g" in page.text
+    assert "site-shell.js?v=20260801a" in page.text
 
 
 def test_beginner_guide_is_publicly_available() -> None:
@@ -57,7 +58,36 @@ def test_beginner_guide_is_publicly_available() -> None:
     assert "What is a stock ticker?" in page.text
     assert "Signal score" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260731g" in page.text
+    assert "site-shell.js?v=20260801a" in page.text
+
+
+def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(main, "auth_store", AuthStore(tmp_path / "auth-test.db"))
+    client = TestClient(app)
+    page = client.get("/login.html")
+    assert page.status_code == 200
+    assert "Create account" in page.text
+    assert "auth.js?v=20260801a" in page.text
+
+    registration = client.post("/api/auth/register", json={
+        "display_name": "Test Investor",
+        "email": "investor@example.com",
+        "password": "a-secure-password",
+    })
+    assert registration.status_code == 201
+    assert registration.json()["authenticated"] is True
+    assert client.get("/api/auth/me").json()["user"]["display_name"] == "Test Investor"
+
+    assert client.post("/api/auth/logout").status_code == 200
+    assert client.get("/api/auth/me").json()["authenticated"] is False
+    assert client.post("/api/auth/login", json={
+        "email": "investor@example.com",
+        "password": "incorrect",
+    }).status_code == 401
+    assert client.post("/api/auth/login", json={
+        "email": "investor@example.com",
+        "password": "a-secure-password",
+    }).status_code == 200
 
 
 def test_request_validation() -> None:
