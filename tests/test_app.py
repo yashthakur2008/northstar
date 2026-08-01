@@ -36,8 +36,8 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260801b" in page.text
-    assert "script.js?v=20260801b" in page.text
+    assert "style.css?v=20260801c" in page.text
+    assert "script.js?v=20260801c" in page.text
     assert "How to use Northstar" in page.text
     assert "Turn a ticker into a testable investment case" in page.text
     assert "Live portfolio" in page.text
@@ -48,9 +48,9 @@ def test_all_news_page_is_available() -> None:
     page = TestClient(app).get("/news.html")
     assert page.status_code == 200
     assert "Market news" in page.text
-    assert "news.js?v=20260801b" in page.text
+    assert "news.js?v=20260801c" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260801b" in page.text
+    assert "site-shell.js?v=20260801c" in page.text
 
 
 def test_beginner_guide_is_publicly_available() -> None:
@@ -60,7 +60,7 @@ def test_beginner_guide_is_publicly_available() -> None:
     assert "What is a stock ticker?" in page.text
     assert "Signal score" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260801b" in page.text
+    assert "site-shell.js?v=20260801c" in page.text
 
 
 def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
@@ -68,8 +68,10 @@ def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
     client = TestClient(app)
     page = client.get("/login.html")
     assert page.status_code == 200
-    assert "Create account" in page.text
-    assert "auth.js?v=20260801b" in page.text
+    assert ">Register<" in page.text
+    assert "Continue with Google" in page.text
+    assert "Continue with GitHub" in page.text
+    assert "auth.js?v=20260801c" in page.text
 
     registration = client.post("/api/auth/register", json={
         "display_name": "Test Investor",
@@ -121,6 +123,21 @@ def test_live_portfolio_requires_login_and_persists_holdings(tmp_path) -> None:
     finally:
         main.auth_store = previous_store
         main.engine.provider = previous_provider
+
+
+def test_oauth_provider_status_and_identity_linking(tmp_path, monkeypatch) -> None:
+    store = AuthStore(tmp_path / "oauth-test.db")
+    user = store.oauth_user("google", "google-123", "oauth@example.com", "OAuth User")
+    repeated = store.oauth_user("google", "google-123", "oauth@example.com", "OAuth User")
+    assert repeated["id"] == user["id"]
+    monkeypatch.setattr(main, "auth_store", store)
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "test-google-id")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "test-google-secret")
+    providers = TestClient(app).get("/api/auth/providers")
+    assert providers.json() == {"google": True, "github": False}
+    start = TestClient(app).get("/api/auth/oauth/google", follow_redirects=False)
+    assert start.status_code == 303
+    assert start.headers["location"].startswith("https://accounts.google.com/")
 
 
 def test_request_validation() -> None:

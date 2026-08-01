@@ -8,13 +8,15 @@ import logging
 import math
 import os
 import re
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
 from fastapi import Cookie, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
+import httpx
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -28,6 +30,8 @@ FRONTEND_DIR = BASE_DIR.parent / "frontend"
 engine = AnalysisEngine()
 auth_store = AuthStore(Path(os.getenv("AUTH_DB_PATH", BASE_DIR / "northstar_auth.db")))
 SESSION_COOKIE = "northstar_session"
+OAUTH_STATE_COOKIE = "northstar_oauth_state"
+OAUTH_NEXT_COOKIE = "northstar_oauth_next"
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -92,6 +96,16 @@ def set_session_cookie(response: Response, request: Request, token: str) -> None
         samesite="lax",
         path="/",
     )
+
+def oauth_settings(provider: str) -> tuple[str, str] | None:
+    key = provider.upper()
+    client_id = os.getenv(f"{key}_CLIENT_ID", "").strip()
+    client_secret = os.getenv(f"{key}_CLIENT_SECRET", "").strip()
+    return (client_id, client_secret) if client_id and client_secret else None
+
+
+def secure_request_cookie(request: Request) -> bool:
+    return request.url.scheme == "https" or bool(os.getenv("RENDER")) or os.getenv("COOKIE_SECURE", "").lower() == "true"
 
 def require_user(session_token: str | None) -> dict:
     user = auth_store.user_for_session(session_token)
@@ -184,6 +198,93 @@ async def logout(response: Response, northstar_session: str | None = Cookie(defa
     auth_store.delete_session(northstar_session)
     response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax")
     return {"authenticated": False}
+
+
+@app.get("/api/auth/providers")
+async def auth_providers() -> dict:
+    return {"google": oauth_settings("google") is not None, "github": oauth_settings("github") is not None}
+
+
+@app.get("/api/auth/oauth/{provider}")
+async def oauth_start(provider: Literal["google", "github"], request: Request, next: str = "/") -> RedirectResponse:
+    settings = oauth_settings(provider)
+    if settings is None:
+        return RedirectResponse(f"/login.html?oauth_error={provider}_not_configured", status_code=303)
+    client_id, _ = settings
+    state = secrets.token_urlsafe(32)
+    callback = str(request.url_for("oauth_callback", provider=provider))
+    safe_next = next if next.startswith("/") and not next.startswith("//") else "/"
+    if provider == "google":
+        url = httpx.URL("https://accounts.google.com/o/oauth2/v2/auth", params={
+            "client_id": client_id, "redirect_uri": callback, "response_type": "code",
+            "scope": "openid email profile", "state": state, "prompt": "select_account",
+        })
+    else:
+        url = httpx.URL("https://github.com/login/oauth/authorize", params={
+            "client_id": client_id, "redirect_uri": callback, "scope": "read:user user:email", "state": state,
+        })
+    response = RedirectResponse(str(url), status_code=303)
+    response.set_cookie(OAUTH_STATE_COOKIE, state, max_age=600, httponly=True, secure=secure_request_cookie(request), samesite="lax")
+    response.set_cookie(OAUTH_NEXT_COOKIE, safe_next, max_age=600, httponly=True, secure=secure_request_cookie(request), samesite="lax")
+    return response
+
+
+@app.get("/api/auth/oauth/{provider}/callback", name="oauth_callback")
+async def oauth_callback(
+    provider: Literal["google", "github"],
+    request: Request,
+    code: str = Query(min_length=3),
+    state: str = Query(min_length=10),
+    northstar_oauth_state: str | None = Cookie(default=None),
+    northstar_oauth_next: str | None = Cookie(default="/"),
+) -> RedirectResponse:
+    settings = oauth_settings(provider)
+    if settings is None or not northstar_oauth_state or not secrets.compare_digest(state, northstar_oauth_state):
+        return RedirectResponse("/login.html?oauth_error=invalid_state", status_code=303)
+    client_id, client_secret = settings
+    callback = str(request.url_for("oauth_callback", provider=provider))
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            if provider == "google":
+                token_response = await client.post("https://oauth2.googleapis.com/token", data={
+                    "client_id": client_id, "client_secret": client_secret, "code": code,
+                    "grant_type": "authorization_code", "redirect_uri": callback,
+                })
+                token_response.raise_for_status()
+                token = token_response.json()["access_token"]
+                profile_response = await client.get("https://openidconnect.googleapis.com/v1/userinfo", headers={"Authorization": f"Bearer {token}"})
+                profile_response.raise_for_status()
+                profile = profile_response.json()
+                provider_id, email, name = str(profile["sub"]), profile["email"], profile.get("name") or profile["email"].split("@")[0]
+            else:
+                token_response = await client.post("https://github.com/login/oauth/access_token", data={
+                    "client_id": client_id, "client_secret": client_secret, "code": code, "redirect_uri": callback,
+                }, headers={"Accept": "application/json"})
+                token_response.raise_for_status()
+                token = token_response.json()["access_token"]
+                headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+                profile_response = await client.get("https://api.github.com/user", headers=headers)
+                profile_response.raise_for_status()
+                profile = profile_response.json()
+                email = profile.get("email")
+                if not email:
+                    emails_response = await client.get("https://api.github.com/user/emails", headers=headers)
+                    emails_response.raise_for_status()
+                    emails = emails_response.json()
+                    selected = next((item for item in emails if item.get("primary") and item.get("verified")), None)
+                    email = selected["email"] if selected else None
+                if not email:
+                    raise ValueError("A verified GitHub email is required.")
+                provider_id, name = str(profile["id"]), profile.get("name") or profile.get("login") or email.split("@")[0]
+        user = auth_store.oauth_user(provider, provider_id, normalize_email(email), " ".join(name.strip().split()))
+    except (httpx.HTTPError, KeyError, ValueError):
+        return RedirectResponse(f"/login.html?oauth_error={provider}_failed", status_code=303)
+    destination = northstar_oauth_next if northstar_oauth_next and northstar_oauth_next.startswith("/") and not northstar_oauth_next.startswith("//") else "/"
+    response = RedirectResponse(destination, status_code=303)
+    set_session_cookie(response, request, auth_store.create_session(user["id"]))
+    response.delete_cookie(OAUTH_STATE_COOKIE, path="/")
+    response.delete_cookie(OAUTH_NEXT_COOKIE, path="/")
+    return response
 
 
 @app.get("/api/portfolio", response_model=Portfolio)

@@ -6,6 +6,7 @@ const authStatus = document.querySelector("#auth-status");
 const accountName = document.querySelector("#account-name");
 const accountEmail = document.querySelector("#account-email");
 const logoutButton = document.querySelector("#logout-button");
+const oauthButtons = [...document.querySelectorAll("[data-oauth]")];
 
 function showStatus(message, tone = "") {
   authStatus.textContent = message;
@@ -92,3 +93,18 @@ fetch("/api/auth/me", { credentials: "same-origin" })
     showGateway();
     showStatus("Account services are temporarily unavailable.", "error");
   });
+
+const query = new URLSearchParams(location.search);
+const oauthError = query.get("oauth_error");
+if (oauthError) {
+  showStatus(oauthError.includes("not_configured") ? "This sign-in provider has not been configured yet." : "External sign-in could not be completed. Please try again.", "error");
+}
+fetch("/api/auth/providers")
+  .then(response => response.json())
+  .then(providers => oauthButtons.forEach(button => {
+    const available = Boolean(providers[button.dataset.oauth]);
+    button.classList.toggle("is-unavailable", !available);
+    button.setAttribute("aria-disabled", String(!available));
+    if (!available) button.title = `${button.dataset.oauth === "google" ? "Google" : "GitHub"} sign-in requires server credentials`;
+  }))
+  .catch(() => oauthButtons.forEach(button => button.classList.add("is-unavailable")));

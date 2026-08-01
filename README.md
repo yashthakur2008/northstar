@@ -21,6 +21,8 @@ Manager verdict as a streamed event sequence.
 - Separate, timestamped market-news section with outbound source links, stale-cache protection, and RSS failover
 - Context-aware guided Help tour for every major research surface
 - Persistent light/dark theme control with first-visit system preference
+- Password and optional Google/GitHub OAuth login with HTTP-only sessions
+- Account-linked portfolios with provider-refreshed value, session change, and cost-basis return
 - Typed contracts, same-origin security defaults, health check, and API docs
 - Responsive dashboard with loading, partial-data, and failure states
 
@@ -61,6 +63,7 @@ Open <http://localhost:8000>; API docs are at <http://localhost:8000/api/docs>.
 - `POST /api/analyze/stream` — SSE `status`, `debate`, and `report` events
 - `GET /api/market-pulse` — recent stock snapshots, mini-chart history, and current headlines
 - `GET /api/stock-analyzer` — validated OHLCV history and derived range, return, volume, and volatility metrics
+- `GET /api/portfolio` — authenticated, provider-refreshed portfolio
 
 ```json
 {"tickers": ["NVDA", "MSFT"], "debate_rounds": 2}
@@ -70,6 +73,29 @@ The Yahoo Finance adapter and Nasdaq fallback need no key. Set `ALLOWED_ORIGINS`
 for a separately hosted frontend (comma-separated exact origins). Same-origin
 deployment intentionally adds no CORS middleware. The service fails closed when
 market data is unavailable and issues no synthetic prediction.
+
+## Optional Google and GitHub login
+
+Email/password registration works without external credentials. To enable the
+federated buttons on Render, add these environment variables:
+
+```text
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET
+```
+
+Register these production callback URLs with the corresponding OAuth apps:
+
+```text
+https://hedgefundai.onrender.com/api/auth/oauth/google/callback
+https://hedgefundai.onrender.com/api/auth/oauth/github/callback
+```
+
+For local OAuth testing, register the equivalent callback on
+`http://localhost:8000`. Northstar validates a short-lived state cookie before
+exchanging an authorization code and never sends provider tokens to the browser.
 
 ## Accuracy posture
 

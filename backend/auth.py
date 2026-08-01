@@ -54,8 +54,55 @@ class AuthStore:
                     PRIMARY KEY (user_id, symbol),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS oauth_identities (
+                    provider TEXT NOT NULL,
+                    provider_user_id TEXT NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    PRIMARY KEY (provider, provider_user_id),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
                 """
             )
+
+    def oauth_user(self, provider: str, provider_user_id: str, email: str, display_name: str) -> dict:
+        now = int(time.time())
+        with self._connect() as connection:
+            existing = connection.execute(
+                """
+                SELECT users.id, users.email, users.display_name
+                FROM oauth_identities
+                JOIN users ON users.id = oauth_identities.user_id
+                WHERE provider = ? AND provider_user_id = ?
+                """,
+                (provider, provider_user_id),
+            ).fetchone()
+            if existing is not None:
+                return dict(existing)
+            user = connection.execute(
+                "SELECT id, email, display_name FROM users WHERE email = ? COLLATE NOCASE",
+                (email,),
+            ).fetchone()
+            if user is None:
+                salt = secrets.token_bytes(16)
+                cursor = connection.execute(
+                    """
+                    INSERT INTO users (email, display_name, password_hash, password_salt, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (email, display_name, self._password_hash(secrets.token_urlsafe(48), salt), salt, now),
+                )
+                user_id = cursor.lastrowid
+                user = {"id": user_id, "email": email, "display_name": display_name}
+            connection.execute(
+                """
+                INSERT INTO oauth_identities (provider, provider_user_id, user_id, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (provider, provider_user_id, user["id"], now),
+            )
+        return dict(user)
 
     @staticmethod
     def _password_hash(password: str, salt: bytes) -> bytes:
