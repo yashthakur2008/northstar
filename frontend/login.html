@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260801d">
+  <link rel="stylesheet" href="style.css?v=20260802a">
 </head>
 <body>
   <header class="topbar">
@@ -38,17 +38,21 @@
   <main class="auth-page">
     <section class="auth-intro">
       <div class="auth-visual" aria-hidden="true">
-        <div class="auth-orbit auth-orbit-one"></div><div class="auth-orbit auth-orbit-two"></div>
-        <svg viewBox="0 0 760 320" preserveAspectRatio="none">
-          <defs><linearGradient id="auth-line" x1="0" x2="1"><stop stop-color="#4fc7a0" stop-opacity=".08"/><stop offset=".45" stop-color="#4fc7a0"/><stop offset="1" stop-color="#4fc7a0" stop-opacity=".16"/></linearGradient></defs>
-          <path class="auth-grid-line" d="M0 64H760M0 128H760M0 192H760M0 256H760M126 0V320M252 0V320M378 0V320M504 0V320M630 0V320"/>
-          <path class="auth-signal-glow" d="M0 246C70 236 82 258 142 220S228 231 282 178 358 194 416 137 493 151 548 88 638 111 760 40"/>
-          <path class="auth-signal" d="M0 246C70 236 82 258 142 220S228 231 282 178 358 194 416 137 493 151 548 88 638 111 760 40"/>
+        <div class="auth-market-top"><span>Northstar market study</span><span>Illustrative interface</span></div>
+        <div class="auth-market-quote"><span>NVDA · NASDAQ</span><strong>$200.75</strong><em>+2.93%</em></div>
+        <svg class="auth-market-chart" viewBox="0 0 760 320" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="auth-area" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#49c69e" stop-opacity=".28"/><stop offset="1" stop-color="#49c69e" stop-opacity="0"/></linearGradient>
+          </defs>
+          <path class="auth-grid-line" d="M0 64H760M0 128H760M0 192H760M0 256H760M95 0V320M190 0V320M285 0V320M380 0V320M475 0V320M570 0V320M665 0V320"/>
+          <path class="auth-market-area" d="M0 250L48 237L89 245L132 218L174 224L218 176L261 195L306 158L350 170L395 113L438 139L481 105L526 124L570 71L615 94L661 52L705 69L760 31L760 320L0 320Z"/>
+          <path class="auth-market-line" d="M0 250L48 237L89 245L132 218L174 224L218 176L261 195L306 158L350 170L395 113L438 139L481 105L526 124L570 71L615 94L661 52L705 69L760 31"/>
+          <g class="auth-candles">
+            <path d="M92 206V265M82 222H102V250H82Z"/><path d="M176 170V229M166 184H186V214H166Z"/><path d="M264 153V208M254 166H274V194H254Z"/><path d="M350 118V184M340 137H360V168H340Z"/><path d="M438 99V155M428 112H448V141H428Z"/><path d="M526 76V140M516 91H536V125H516Z"/><path d="M615 47V110M605 63H625V95H605Z"/><path d="M704 30V91M694 45H714V75H694Z"/>
+          </g>
         </svg>
-        <span class="auth-node auth-node-bull"><b>B+</b><small>Bull case</small></span>
-        <span class="auth-node auth-node-risk"><b>R</b><small>Risk check</small></span>
-        <span class="auth-node auth-node-pm"><b>PM</b><small>Verdict</small></span>
-        <div class="auth-visual-caption"><span>Research path</span><strong>Evidence → Debate → Decision</strong></div>
+        <div class="auth-volume-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="auth-ticker-strip"><span>MSFT <b>+1.26%</b></span><span>AAPL <b class="down">−0.48%</b></span><span>AMZN <b>+0.84%</b></span><span>GOOGL <b>+1.17%</b></span></div>
       </div>
       <p class="kicker">Northstar account</p>
       <h1>Your research desk, ready when you are.</h1>
@@ -62,11 +66,11 @@
           <button type="button" role="tab" data-auth-tab="login" aria-selected="true">Sign in</button>
           <button type="button" role="tab" data-auth-tab="register" aria-selected="false">Register</button>
         </div>
-        <div class="oauth-options" aria-label="Continue with another provider">
-          <a class="oauth-button" data-oauth="google" href="/api/auth/oauth/google"><span class="google-mark" aria-hidden="true">G</span>Continue with Google</a>
-          <a class="oauth-button" data-oauth="github" href="/api/auth/oauth/github"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2.22c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.29-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18A10.95 10.95 0 0 1 12 6.13c.98 0 1.95.13 2.87.39 2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.4-2.71 5.38-5.29 5.67.42.36.79 1.07.79 2.16v3.24c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>Continue with GitHub</a>
+        <div id="oauth-options" class="oauth-options" aria-label="Continue with another provider" hidden>
+          <a class="oauth-button" data-oauth="google" href="/api/auth/oauth/google" hidden><span class="google-mark" aria-hidden="true">G</span>Continue with Google</a>
+          <a class="oauth-button" data-oauth="github" href="/api/auth/oauth/github" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2.22c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.29-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18A10.95 10.95 0 0 1 12 6.13c.98 0 1.95.13 2.87.39 2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.4-2.71 5.38-5.29 5.67.42.36.79 1.07.79 2.16v3.24c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>Continue with GitHub</a>
         </div>
-        <div class="auth-divider"><span>or use email</span></div>
+        <div id="auth-divider" class="auth-divider" hidden><span>or use email</span></div>
         <form class="auth-form" data-auth-form="login">
           <div><h2 id="auth-title">Welcome back</h2><p>Continue to the Northstar research desk.</p></div>
           <label>Email address<input name="email" type="email" autocomplete="email" required></label>
@@ -91,7 +95,7 @@
       <p id="auth-status" class="auth-status" role="status" aria-live="polite"></p>
     </section>
   </main>
-  <script src="site-shell.js?v=20260801d"></script>
-  <script src="auth.js?v=20260801d"></script>
+  <script src="site-shell.js?v=20260802a"></script>
+  <script src="auth.js?v=20260802a"></script>
 </body>
 </html>

@@ -7,6 +7,8 @@ const accountName = document.querySelector("#account-name");
 const accountEmail = document.querySelector("#account-email");
 const logoutButton = document.querySelector("#logout-button");
 const oauthButtons = [...document.querySelectorAll("[data-oauth]")];
+const oauthOptions = document.querySelector("#oauth-options");
+const authDivider = document.querySelector("#auth-divider");
 
 function showStatus(message, tone = "") {
   authStatus.textContent = message;
@@ -97,14 +99,34 @@ fetch("/api/auth/me", { credentials: "same-origin" })
 const query = new URLSearchParams(location.search);
 const oauthError = query.get("oauth_error");
 if (oauthError) {
-  showStatus(oauthError.includes("not_configured") ? "This sign-in provider has not been configured yet." : "External sign-in could not be completed. Please try again.", "error");
+  showStatus(
+    oauthError.includes("not_configured")
+      ? "That external sign-in option is not currently available. Use email sign-in or registration."
+      : "External sign-in could not be completed. Please try again.",
+    "error",
+  );
 }
 fetch("/api/auth/providers")
   .then(response => response.json())
-  .then(providers => oauthButtons.forEach(button => {
-    const available = Boolean(providers[button.dataset.oauth]);
-    button.classList.toggle("is-unavailable", !available);
-    button.setAttribute("aria-disabled", String(!available));
-    if (!available) button.title = `${button.dataset.oauth === "google" ? "Google" : "GitHub"} sign-in requires server credentials`;
-  }))
-  .catch(() => oauthButtons.forEach(button => button.classList.add("is-unavailable")));
+  .then((providers) => {
+    let availableCount = 0;
+    oauthButtons.forEach((button) => {
+      const available = Boolean(providers[button.dataset.oauth]);
+      button.hidden = !available;
+      button.removeAttribute("aria-disabled");
+      button.removeAttribute("title");
+      if (available) availableCount += 1;
+    });
+    if (oauthOptions) {
+      oauthOptions.hidden = availableCount === 0;
+      oauthOptions.classList.toggle("single-provider", availableCount === 1);
+    }
+    if (authDivider) authDivider.hidden = availableCount === 0;
+  })
+  .catch(() => {
+    oauthButtons.forEach((button) => {
+      button.hidden = true;
+    });
+    if (oauthOptions) oauthOptions.hidden = true;
+    if (authDivider) authDivider.hidden = true;
+  });

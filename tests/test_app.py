@@ -36,8 +36,8 @@ def test_frontend_assets_cannot_mix_across_deployments() -> None:
     assert "no-store" in page.headers["cache-control"]
     assert "no-store" in stylesheet.headers["cache-control"]
     assert "no-store" in script.headers["cache-control"]
-    assert "style.css?v=20260801d" in page.text
-    assert "script.js?v=20260801d" in page.text
+    assert "style.css?v=20260802a" in page.text
+    assert "script.js?v=20260802a" in page.text
     assert "How to use Northstar" in page.text
     assert "Turn a ticker into a testable investment case" in page.text
     assert "Live portfolio" in page.text
@@ -48,9 +48,9 @@ def test_all_news_page_is_available() -> None:
     page = TestClient(app).get("/news.html")
     assert page.status_code == 200
     assert "Market news" in page.text
-    assert "news.js?v=20260801d" in page.text
+    assert "news.js?v=20260802a" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260801d" in page.text
+    assert "site-shell.js?v=20260802a" in page.text
 
 
 def test_beginner_guide_is_publicly_available() -> None:
@@ -60,7 +60,7 @@ def test_beginner_guide_is_publicly_available() -> None:
     assert "What is a stock ticker?" in page.text
     assert "Signal score" in page.text
     assert 'id="theme-toggle"' in page.text
-    assert "site-shell.js?v=20260801d" in page.text
+    assert "site-shell.js?v=20260802a" in page.text
 
 
 def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
@@ -71,7 +71,10 @@ def test_account_page_and_authentication_flow(tmp_path, monkeypatch) -> None:
     assert ">Register<" in page.text
     assert "Continue with Google" in page.text
     assert "Continue with GitHub" in page.text
-    assert "auth.js?v=20260801d" in page.text
+    assert 'id="oauth-options"' in page.text
+    assert "Northstar market study" in page.text
+    assert "Illustrative interface" in page.text
+    assert "auth.js?v=20260802a" in page.text
 
     registration = client.post("/api/auth/register", json={
         "display_name": "Test Investor",
@@ -135,7 +138,7 @@ def test_research_portfolio_page_is_available() -> None:
     assert "Turn a ticker into a testable investment case" in page.text
     assert "Your live research book" in page.text
     assert "Portfolio value" in page.text
-    assert "research.js?v=20260801d" in page.text
+    assert "research.js?v=20260802a" in page.text
     assert "no-store" in page.headers["cache-control"]
 
 
