@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Build and monitor a live custom portfolio with Northstar research tools.">
+  <title>Research & Portfolio · Northstar</title>
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("northstar-theme");
+        const theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch (_) {}
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20260801d">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northstar home"><span class="brand-mark">N</span><span>Northstar</span></a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="/">Home</a><a href="/research.html" aria-current="page">Research</a><a href="/news.html">News</a><a href="/beginners.html">Learn</a>
+    </nav>
+    <div class="topbar-actions">
+      <a class="help-button" href="/beginners.html"><span aria-hidden="true">?</span> Guide</a>
+      <a class="account-link" data-auth-link href="/login.html">Log in</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch theme" aria-pressed="false"><span class="theme-icon" aria-hidden="true">☾</span><span class="theme-label">Dark</span></button>
+    </div>
+  </header>
+
+  <main class="research-page">
+    <section class="research-overview research-page-overview" aria-labelledby="research-title">
+      <div class="research-overview-intro">
+        <p class="kicker">What research means here</p>
+        <h1 id="research-title">Turn a ticker into a testable investment case.</h1>
+        <p>Northstar organizes current price evidence into a transparent argument you can inspect, challenge, and verify. It is a research screen—not a guaranteed return.</p>
+      </div>
+      <div class="research-pillars">
+        <article><span>01</span><strong>Frame the question</strong><p>Choose the securities, position sizes, and time windows worth testing.</p></article>
+        <article><span>02</span><strong>Pressure-test both sides</strong><p>Bull and Bear interpret the same evidence while Risk defines what invalidates either case.</p></article>
+        <article><span>03</span><strong>Read the verdict carefully</strong><p>Compare evidence strength, confidence, sources, and known gaps—not a promised outcome.</p></article>
+      </div>
+    </section>
+
+    <section class="research-portfolio" aria-labelledby="portfolio-title">
+      <div class="research-portfolio-head">
+        <div><p class="kicker">Custom portfolio</p><h2 id="portfolio-title">Your live research book</h2><p>Build a hypothetical portfolio and monitor its latest validated value, allocation, cost-basis return, and recent path.</p></div>
+        <span id="portfolio-refresh">Refreshes every minute</span>
+      </div>
+      <div id="portfolio-gate" class="portfolio-gate">A free account is required to save a portfolio across visits. <a href="/login.html?next=/research.html">Log in or register →</a></div>
+      <div id="portfolio-workspace" hidden>
+        <form id="portfolio-form" class="portfolio-form research-portfolio-form">
+          <label>Ticker<input id="portfolio-symbol" maxlength="10" placeholder="NVDA" required></label>
+          <label>Shares<input id="portfolio-shares" type="number" min="0.0001" max="1000000" step="any" placeholder="10" required></label>
+          <label>Average cost <small>optional</small><input id="portfolio-cost" type="number" min="0.01" step="any" placeholder="185.00"></label>
+          <button type="submit">Add or update →</button>
+        </form>
+        <div id="portfolio-empty" class="portfolio-empty">Add your first holding to generate the live portfolio dashboard.</div>
+        <div id="portfolio-dashboard" hidden>
+          <div id="portfolio-stats" class="portfolio-stats"></div>
+          <div class="portfolio-visual-grid">
+            <section class="portfolio-chart-card">
+              <div class="portfolio-card-head"><div><span>Portfolio value</span><strong id="portfolio-chart-value"></strong></div><span id="portfolio-chart-range"></span></div>
+              <div id="portfolio-chart" class="portfolio-chart"></div>
+            </section>
+            <section class="portfolio-allocation-card">
+              <div class="portfolio-card-head"><div><span>Allocation</span><strong>Position weights</strong></div></div>
+              <div id="portfolio-allocation" class="portfolio-allocation"></div>
+            </section>
+          </div>
+          <div id="portfolio-table" class="portfolio-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="research-principles">
+      <div><p class="kicker">How to use the numbers</p><h2>Useful statistics, with visible limits.</h2></div>
+      <div class="research-principle-grid">
+        <article><strong>Current value</strong><p>Latest validated price multiplied by the shares entered. It is not an executable brokerage quote.</p></article>
+        <article><strong>Return vs. cost</strong><p>Gain or loss relative to the average costs you provide. Holdings without a cost basis are excluded.</p></article>
+        <article><strong>Realized volatility</strong><p>Annualized variation in recent daily portfolio returns. Higher volatility means a less stable path, not automatically a bad investment.</p></article>
+        <article><strong>Contributors</strong><p>Best and worst positions by cost-basis return when available, otherwise by the latest session change.</p></article>
+      </div>
+    </section>
+  </main>
+  <footer>Latest provider-validated market data. Portfolio tools are educational and are not investment advice.</footer>
+  <script src="site-shell.js?v=20260801d"></script>
+  <script src="research.js?v=20260801d"></script>
+</body>
+</html>

@@ -161,10 +161,21 @@ class PortfolioHolding(BaseModel):
     source: str
 
 
+class PortfolioPoint(BaseModel):
+    timestamp: datetime
+    value: float = Field(ge=0)
+
+
 class Portfolio(BaseModel):
     holdings: list[PortfolioHolding]
     total_value: float
     day_change_value: float
     total_return_value: float | None = None
+    total_return_pct: float | None = None
+    invested_value: float | None = None
+    volatility: float | None = None
+    best_contributor: str | None = None
+    worst_contributor: str | None = None
+    history: list[PortfolioPoint] = Field(default_factory=list)
     generated_at: datetime
     source_status: Literal["live", "partial", "unavailable"]

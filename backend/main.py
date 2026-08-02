@@ -50,8 +50,8 @@ if allowed_origins:
 async def prevent_mixed_frontend_versions(request, call_next):
     response = await call_next(request)
     if request.url.path in {
-        "/", "/index.html", "/news.html", "/beginners.html", "/login.html",
-        "/style.css", "/script.js", "/news.js", "/site-shell.js", "/auth.js",
+        "/", "/index.html", "/news.html", "/beginners.html", "/login.html", "/research.html",
+        "/style.css", "/script.js", "/news.js", "/site-shell.js", "/auth.js", "/research.js",
     }:
         response.headers["Cache-Control"] = "no-store, max-age=0"
         response.headers["Pragma"] = "no-cache"
@@ -154,11 +154,57 @@ async def build_portfolio(user_id: int) -> Portfolio:
             source=snapshot.source,
         ))
     known_returns = [row.total_return_value for row in holdings if row.total_return_value is not None]
+    invested_value = sum(
+        row.shares * float(row.average_cost)
+        for row in holdings
+        if row.average_cost is not None
+    )
+    history = []
+    successful = [
+        (saved_row, snapshot)
+        for saved_row, snapshot in zip(saved, snapshots)
+        if not isinstance(snapshot, Exception)
+    ]
+    if successful:
+        common_timestamps = set(successful[0][1].timestamps[-64:])
+        for _, snapshot in successful[1:]:
+            common_timestamps &= set(snapshot.timestamps[-64:])
+        price_maps = [
+            (float(saved_row["shares"]), dict(zip(snapshot.timestamps, snapshot.prices)))
+            for saved_row, snapshot in successful
+        ]
+        history = [
+            {
+                "timestamp": datetime.fromtimestamp(timestamp, tz=timezone.utc),
+                "value": round(sum(shares * prices[timestamp] for shares, prices in price_maps), 2),
+            }
+            for timestamp in sorted(common_timestamps)
+        ]
+    history_returns = [
+        history[index]["value"] / history[index - 1]["value"] - 1
+        for index in range(1, len(history))
+        if history[index - 1]["value"] > 0
+    ]
+    portfolio_volatility = None
+    if len(history_returns) > 1:
+        mean_return = sum(history_returns) / len(history_returns)
+        variance = sum((value - mean_return) ** 2 for value in history_returns) / (len(history_returns) - 1)
+        portfolio_volatility = round(math.sqrt(variance) * math.sqrt(252) * 100, 2)
+    contributor_values = [
+        (row.symbol, row.total_return_value if row.total_return_value is not None else row.day_change_value)
+        for row in holdings
+    ]
     return Portfolio(
         holdings=holdings,
         total_value=round(sum(row.market_value for row in holdings), 2),
         day_change_value=round(sum(row.day_change_value for row in holdings), 2),
         total_return_value=round(sum(known_returns), 2) if known_returns else None,
+        total_return_pct=round(sum(known_returns) / invested_value * 100, 2) if known_returns and invested_value else None,
+        invested_value=round(invested_value, 2) if invested_value else None,
+        volatility=portfolio_volatility,
+        best_contributor=max(contributor_values, key=lambda row: row[1])[0] if contributor_values else None,
+        worst_contributor=min(contributor_values, key=lambda row: row[1])[0] if contributor_values else None,
+        history=history,
         generated_at=datetime.now(timezone.utc),
         source_status="unavailable" if not holdings else "partial" if failures else "live",
     )
